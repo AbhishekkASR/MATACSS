@@ -1,0 +1,23 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-matacss}
+      POSTGRES_USER: ${POSTGRES_USER:-matacss_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in backend/.env or the shell}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - matacss_postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U ${POSTGRES_USER:-matacss_user} -d ${POSTGRES_DB:-matacss}
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+volumes:
+  matacss_postgres_data:
