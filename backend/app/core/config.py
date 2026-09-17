@@ -9,6 +9,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 ROOT = Path(__file__).resolve().parents[2]
+ALLOWED_JWT_ALGORITHMS = {"HS256", "HS384", "HS512"}
+
 load_dotenv(ROOT / ".env", override=False)
 if (os.getenv("APP_ENV") or "development").lower() == "production":
     load_dotenv(ROOT / ".env.production", override=False)
@@ -122,7 +124,11 @@ class Settings:
         sandbox_pids_limit = int(_env_value("MATACSS_SANDBOX_PIDS_LIMIT", "64"))
         sandbox_output_limit_bytes = int(_env_value("MATACSS_SANDBOX_OUTPUT_LIMIT_BYTES", "65536"))
         jwt_secret = _env_value("MATACSS_JWT_SECRET", "")
-        jwt_algorithm = _env_value("MATACSS_JWT_ALGORITHM", "HS256")
+        jwt_algorithm = _env_value("MATACSS_JWT_ALGORITHM", "HS256").strip().upper()
+        if jwt_algorithm not in ALLOWED_JWT_ALGORITHMS:
+            raise ValueError(
+                "MATACSS_JWT_ALGORITHM must be one of HS256, HS384, or HS512."
+            )
         jwt_expire_minutes = int(_env_value("MATACSS_JWT_EXPIRE_MINUTES", "60"))
         log_level = _env_value("MATACSS_LOG_LEVEL", "INFO").upper()
         if log_level not in {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}:
@@ -189,6 +195,8 @@ class Settings:
             raise ValueError("MATACSS_WORKER_BATCH_SIZE must be positive.")
         if self.worker_max_concurrency <= 0:
             raise ValueError("MATACSS_WORKER_MAX_CONCURRENCY must be positive.")
+        if self.jwt_algorithm not in ALLOWED_JWT_ALGORITHMS:
+            raise ValueError("MATACSS_JWT_ALGORITHM must be one of HS256, HS384, or HS512.")
         if not self.frontend_origins:
             object.__setattr__(self, "frontend_origins", ("http://127.0.0.1:3000", "http://localhost:3000"))
 
@@ -207,6 +215,8 @@ class Settings:
             raise ValueError("Production CORS origins must be explicit and not wildcard.")
         if not self.jwt_algorithm:
             raise ValueError("MATACSS_JWT_ALGORITHM must be configured for production.")
+        if self.jwt_algorithm not in ALLOWED_JWT_ALGORITHMS:
+            raise ValueError("MATACSS_JWT_ALGORITHM must be one of HS256, HS384, or HS512 in production.")
         if self.api_port <= 0:
             raise ValueError("MATACSS_API_PORT must be a positive integer in production.")
         if self.worker_poll_interval_seconds <= 0:

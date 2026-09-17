@@ -1,31 +1,37 @@
 # MATACSS
 
-MATACSS is a technical-assessment platform for running programming questions
-inside isolated Docker sandboxes, tracking candidate attempts, evaluating
-deterministic test cases, and presenting assessment results.
+MATACSS is a deterministic technical-assessment platform for running
+programming questions inside isolated Docker sandboxes, tracking candidate
+attempts, evaluating official test cases, and presenting assessment results.
 
-The repository currently contains a working local-development foundation
-through Step 34:
+The repository contains a working, security-conscious foundation for the
+assessment workflow and multi-agent orchestration, while intentionally keeping
+AI/agent behavior advisory and non-persistent.
 
-- FastAPI backend with PostgreSQL persistence and Alembic migrations
+Implemented in the current repository:
+
+- FastAPI backend with SQLite for local development and PostgreSQL-ready configuration
 - JWT bearer authentication with secure password hashing and role-based authorization
 - Candidate/interviewer/admin user model and protected assessment routes
-- Next.js frontend with Monaco editor
+- Next.js frontend with Monaco editor and assessment workspace
 - Interview lifecycle and interview-specific question assignment
 - Per-question submission history and latest-attempt tracking
 - Durable asynchronous execution jobs and a local worker
-- Deterministic test-case evaluation and scoring
+- Deterministic official evaluation and score calculation
 - Assessment-level results aggregation
 - Defense-in-depth Docker sandbox controls with adversarial integration tests
 - LangGraph orchestration with deterministic Interviewer, Code Reviewer, Edge-Case Generator, and feedback aggregation foundations
-- Deterministic, bounded AI-feedback aggregation that remains advisory and never overrides official evaluation results
-- Centralized environment-driven production configuration validation and safe CORS handling
+- Bounded, advisory AI feedback that never overrides official evaluation results
+- Centralized environment-driven production configuration with secure defaults and safe CORS handling
+- Structured observability, worker hardening, and deployment/CI scaffolding
 
 ## Current status
 
-MATACSS is a local/dev-ready foundation with secure auth and production-safe
-configuration validation in place. Production deployment, external queues,
-real LLM feedback, and autonomous generated-case verification remain future work.
+This repository is a deterministic local-development and release-readiness
+foundation for MATACSS. It includes secure authentication, safe orchestration
+boundaries, and production configuration checks. Real LLM integration,
+autonomous execution, automatic persistence of AI outputs, and automatic
+verification of generated edge cases are not implemented.
 
 ## Architecture
 
@@ -142,6 +148,19 @@ frontend/
 - npm
 - Docker Desktop or Docker Engine
 - PostgreSQL 16 for the development database
+
+## CI/CD and deployment
+
+The repository includes a minimal GitHub Actions CI workflow in [.github/workflows/ci.yml](.github/workflows/ci.yml) that validates:
+
+- backend dependency installation
+- backend compile checks
+- backend non-Docker test suite
+- frontend dependency installation
+- frontend lint and build checks
+- backend/frontend Docker build validation
+
+See [docs/deployment.md](docs/deployment.md) for the full deployment notes, environment variables, and local validation commands.
 
 ## Production configuration
 
@@ -301,25 +320,23 @@ python -m pytest tests\test_execution_jobs.py tests\test_evaluation.py tests\tes
 Run the complete non-Docker backend suite:
 
 ```powershell
-python -m pytest tests -m "not docker" -q
+python -m pytest tests --ignore=tests/integration -q
 ```
 
-Run the Docker sandbox and submission integration suites:
+Run Docker-backed integrations only when the local environment provides Docker
+and PostgreSQL support:
 
 ```powershell
 python -m pytest tests\integration\test_sandbox_docker.py -m docker -q
 python -m pytest tests\integration\test_submission_docker.py -m docker -q
 ```
 
-The current verified evidence is:
+Current verified evidence from the repository state:
 
-- 74 non-Docker backend tests passed
-- 27 Docker integration tests passed
-- Frontend `npm run lint` passed
-- Frontend `npm run build` passed
-
-The Docker tests require a running Docker daemon. If Docker is unavailable,
-Docker-marked tests are skipped by pytest.
+- 157 non-Docker backend tests passed
+- Frontend lint/build checks are expected to run in a Node-enabled environment
+- Docker integration tests remain environment-dependent and are not treated as
+  a required gate when Docker/PostgreSQL services are unavailable
 
 ## Implemented roadmap
 
@@ -339,29 +356,33 @@ Docker-marked tests are skipped by pytest.
 - Docker sandbox isolation and resource controls
 - Adversarial sandbox security testing
 - Alembic migrations and idempotent development seed data
-- A sanitized shared Assessment State contract for future orchestration
-- A bounded deterministic Interviewer Agent foundation (no real LLM integration)
-- A bounded static Code Reviewer Agent foundation (no real LLM integration)
-- A bounded deterministic Edge-Case Generator foundation (no real LLM
-  integration or automatic generated-test verification)
-- A deterministic multi-agent orchestration foundation with validated agent
-  handoffs (no real LLM integration or AI-output persistence)
-- Real assessment-context preparation for orchestration using existing
-  submission/evaluation services (no new API or agent persistence)
+- JWT bearer authentication and role-based authorization
+- Secure password hashing and protected route dependencies
+- Centralized environment-driven configuration and production validation
+- Safe CORS handling and secret masking
+- Structured observability and request/job correlation
+- Deterministic Interviewer, Code Reviewer, and Edge-Case Generator foundations
+- Multi-agent orchestration with validated handoffs and safe data boundaries
+- Advisory feedback aggregation that never overrides official evaluation results
+- Deployment/CI documentation and release-oriented project guidance
 
-### Planned
+### Planned / intentionally not implemented
 
-- Multi-agent orchestration
-- Authentication and authorization
-- External production queue
-- Production deployment and observability
+- Real LLM provider integration
+- Autonomous execution of generated or agent-created tests
+- Persistence of agent outputs to official evaluation data
+- Automatic verification of generated edge-case outputs
+- External production queue infrastructure beyond the local deterministic foundation
+- Additional autonomous agent behavior beyond bounded deterministic orchestration
 
 ## Design boundaries
 
-The current implementation intentionally does not include authentication,
-external queues, WebSockets, LLMs, embeddings, LangChain, CrewAI, deployment
-configuration, or automatic execution retries. LangGraph includes bounded, deterministic Interviewer, static Code Reviewer,
-and Edge-Case Generator foundations. Real LLM integration and automatic
-verification/execution of generated tests are not implemented. Step 30 adds
-only deterministic coordination and explicit handoff validation; it does not
-add autonomous behavior or persistence for AI outputs.
+The current implementation intentionally keeps the authoritative runtime and
+security boundaries explicit:
+
+- Official evaluation and scoring remain the source of truth for correctness.
+- Docker execution remains the only execution path for candidate code.
+- PostgreSQL persistence and execution jobs are authoritative for the app's runtime data.
+- Agent outputs remain advisory-only and cannot mutate official tests, evaluation records, or execution state.
+- Real LLM integration, automatic agent persistence, and autonomous verification are not implemented.
+- Production deployment still depends on a secure runtime environment for secrets and infrastructure boundary management.

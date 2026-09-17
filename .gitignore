@@ -1,0 +1,45 @@
+# Root-level project ignores
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Databases and local runtime files
+*.db
+*.sqlite3
+*.sqlite
+.env
+.env.*
+!.env.example
+!.env.production.example
+
+# Node / frontend
+node_modules/
+.next/
+out/
+coverage/
+.npm/
+
+# Build artifacts
+dist/
+build/
+*.tsbuildinfo
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.log
+
+# Secrets / certificates
+*.pem
+*.key
+*.crt

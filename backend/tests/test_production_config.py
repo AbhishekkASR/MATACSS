@@ -20,6 +20,17 @@ def test_production_requires_strong_secret_and_explicit_cors(monkeypatch: pytest
         config.Settings()
 
 
+def test_production_rejects_unsafe_jwt_algorithm(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://prod-db.example.com:5432/matacss")
+    monkeypatch.setenv("MATACSS_JWT_SECRET", "a-very-strong-production-secret-1234567890")
+    monkeypatch.setenv("MATACSS_FRONTEND_ORIGINS", "https://app.example.com")
+    monkeypatch.setenv("MATACSS_JWT_ALGORITHM", "none")
+
+    with pytest.raises(ValueError, match="HS256|HS384|HS512"):
+        config.Settings()
+
+
 def test_production_accepts_valid_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("APP_ENV", "production")
     monkeypatch.setenv("DEBUG", "false")
