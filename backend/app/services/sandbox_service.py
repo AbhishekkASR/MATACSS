@@ -114,7 +114,9 @@ class DockerSandboxService:
             self._write_source(container, "/tmp/stdin", stdin)
 
             if runtime.compile_command is not None:
-                compilation = self._run_command(container, runtime.compile_command)
+                compilation = self._run_command(
+                    container, runtime.compile_command, use_stdin=False
+                )
                 if compilation.timed_out:
                     return self._with_duration(compilation, started_at)
                 if compilation.exit_code != 0:
@@ -166,14 +168,18 @@ class DockerSandboxService:
         self,
         container: Any,
         command: tuple[str, ...],
+        use_stdin: bool = True,
     ) -> ExecutionResult:
         started_at = time.perf_counter()
         # The command and redirection target are fixed runtime values, never
         # derived from candidate source, stdin, or other request data.
+        command_string = " ".join(command)
+        if use_stdin:
+            command_string += " < /tmp/stdin"
         command_with_stdin = (
             "sh",
             "-c",
-            f"{' '.join(command)} < /tmp/stdin",
+            command_string,
         )
 
         result_queue: Queue[ExecutionResult] = Queue(maxsize=1)

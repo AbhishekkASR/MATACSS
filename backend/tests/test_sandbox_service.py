@@ -90,6 +90,30 @@ def test_compilation_error_does_not_run_program() -> None:
     container.remove.assert_called_once_with(force=True)
 
 
+def test_compilation_omits_stdin_redirection_but_runtime_keeps_it() -> None:
+    service, client, _ = make_service(
+        [
+            SimpleNamespace(exit_code=0, output=(b"", b"")),
+        ]
+    )
+    client.api.exec_start.side_effect = [
+        iter([(b"", b"")]),
+        iter([(b"ok", b"")]),
+    ]
+
+    result = service.execute("cpp", "int main() {}")
+
+    assert result.status == "success"
+    assert [call.args[1] for call in client.api.exec_create.call_args_list] == [
+        (
+            "sh",
+            "-c",
+            "g++ -std=c++17 -O2 -o /tmp/program /tmp/main.cpp",
+        ),
+        ("sh", "-c", "/tmp/program < /tmp/stdin"),
+    ]
+
+
 def test_output_is_bounded() -> None:
     service, _, _ = make_service(
         [SimpleNamespace(exit_code=0, output=(b"0123456789", b"abcdefghij"))],
