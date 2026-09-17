@@ -5,7 +5,7 @@ inside isolated Docker sandboxes, tracking candidate attempts, evaluating
 deterministic test cases, and presenting assessment results.
 
 The repository currently contains a working local-development foundation
-through Step 24:
+through Step 28:
 
 - FastAPI backend with PostgreSQL persistence and Alembic migrations
 - Next.js frontend with Monaco editor
@@ -15,6 +15,7 @@ through Step 24:
 - Deterministic test-case evaluation and scoring
 - Assessment-level results aggregation
 - Defense-in-depth Docker sandbox controls with adversarial integration tests
+- LangGraph orchestration with deterministic Interviewer and Code Reviewer foundations
 
 ## Current status
 
@@ -321,12 +322,12 @@ Docker-marked tests are skipped by pytest.
 - Docker sandbox isolation and resource controls
 - Adversarial sandbox security testing
 - Alembic migrations and idempotent development seed data
+- A sanitized shared Assessment State contract for future orchestration
+- A bounded deterministic Interviewer Agent foundation (no real LLM integration)
+- A bounded static Code Reviewer Agent foundation (no real LLM integration)
 
 ### Planned
 
-- LangGraph shared state
-- Interviewer Agent
-- Code Reviewer Agent
 - Edge-Case Generator
 - Multi-agent orchestration
 - Authentication and authorization
@@ -336,5 +337,7 @@ Docker-marked tests are skipped by pytest.
 ## Design boundaries
 
 The current implementation intentionally does not include authentication,
-external queues, WebSockets, LLMs, embeddings, LangGraph, CrewAI, deployment
-configuration, or automatic execution retries.
+external queues, WebSockets, LLMs, embeddings, LangChain, CrewAI, deployment
+configuration, or automatic execution retries. LangGraph includes a bounded,
+deterministic Interviewer and static Code Reviewer foundations only; no real
+LLM integration or other AI agents are implemented.
