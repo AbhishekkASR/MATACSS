@@ -1,5 +1,6 @@
 """Persistence services for database-backed interview entities."""
 
+import logging
 from datetime import datetime, timezone
 from uuid import UUID
 
@@ -16,6 +17,8 @@ from app.models.question_test_case import QuestionTestCase
 from app.models.evaluation import EvaluationResult
 from app.models.execution_job import ExecutionJob
 from app.schemas.execution import ExecutionResult
+
+logger = logging.getLogger(__name__)
 
 
 class DuplicateCandidateEmailError(Exception):
@@ -486,6 +489,14 @@ async def claim_next_execution_job(
         job.error_message = "Submission record is unavailable."
         job.completed_at = datetime.now(timezone.utc)
         await session.commit()
+        logger.warning(
+            "Execution job failed to claim because submission was missing",
+            extra={
+                "event": "job_claim_failed",
+                "job_id": str(job.id),
+                "submission_id": str(job.submission_id),
+            },
+        )
         return None
     job.status = "running"
     job.started_at = datetime.now(timezone.utc)
@@ -494,6 +505,14 @@ async def claim_next_execution_job(
     await session.commit()
     await session.refresh(job)
     await session.refresh(submission)
+    logger.info(
+        "Execution job claimed for processing",
+        extra={
+            "event": "job_claimed",
+            "job_id": str(job.id),
+            "submission_id": str(submission.id),
+        },
+    )
     return submission, job
 
 

@@ -5,9 +5,11 @@ inside isolated Docker sandboxes, tracking candidate attempts, evaluating
 deterministic test cases, and presenting assessment results.
 
 The repository currently contains a working local-development foundation
-through Step 28:
+through Step 34:
 
 - FastAPI backend with PostgreSQL persistence and Alembic migrations
+- JWT bearer authentication with secure password hashing and role-based authorization
+- Candidate/interviewer/admin user model and protected assessment routes
 - Next.js frontend with Monaco editor
 - Interview lifecycle and interview-specific question assignment
 - Per-question submission history and latest-attempt tracking
@@ -15,13 +17,15 @@ through Step 28:
 - Deterministic test-case evaluation and scoring
 - Assessment-level results aggregation
 - Defense-in-depth Docker sandbox controls with adversarial integration tests
-- LangGraph orchestration with deterministic Interviewer and Code Reviewer foundations
+- LangGraph orchestration with deterministic Interviewer, Code Reviewer, Edge-Case Generator, and feedback aggregation foundations
+- Deterministic, bounded AI-feedback aggregation that remains advisory and never overrides official evaluation results
+- Centralized environment-driven production configuration validation and safe CORS handling
 
 ## Current status
 
-MATACSS is a local/dev-ready foundation. Authentication, production
-deployment, external queues, and multi-agent features are intentionally not
-implemented yet.
+MATACSS is a local/dev-ready foundation with secure auth and production-safe
+configuration validation in place. Production deployment, external queues,
+real LLM feedback, and autonomous generated-case verification remain future work.
 
 ## Architecture
 
@@ -138,6 +142,19 @@ frontend/
 - npm
 - Docker Desktop or Docker Engine
 - PostgreSQL 16 for the development database
+
+## Production configuration
+
+Use `backend/.env.production.example` as the template for production values.
+The application validates production settings at startup and fails early when:
+
+- `APP_ENV=production` and `MATACSS_JWT_SECRET` is missing or too weak
+- `DATABASE_URL` is missing or uses an insecure SQLite configuration
+- CORS values are missing or wildcarded
+- host/port or worker settings are invalid
+
+Do not commit real secrets. Keep deployment secrets in the runtime environment or
+secret manager for the target platform.
 
 ## Backend setup
 
@@ -325,10 +342,15 @@ Docker-marked tests are skipped by pytest.
 - A sanitized shared Assessment State contract for future orchestration
 - A bounded deterministic Interviewer Agent foundation (no real LLM integration)
 - A bounded static Code Reviewer Agent foundation (no real LLM integration)
+- A bounded deterministic Edge-Case Generator foundation (no real LLM
+  integration or automatic generated-test verification)
+- A deterministic multi-agent orchestration foundation with validated agent
+  handoffs (no real LLM integration or AI-output persistence)
+- Real assessment-context preparation for orchestration using existing
+  submission/evaluation services (no new API or agent persistence)
 
 ### Planned
 
-- Edge-Case Generator
 - Multi-agent orchestration
 - Authentication and authorization
 - External production queue
@@ -338,6 +360,8 @@ Docker-marked tests are skipped by pytest.
 
 The current implementation intentionally does not include authentication,
 external queues, WebSockets, LLMs, embeddings, LangChain, CrewAI, deployment
-configuration, or automatic execution retries. LangGraph includes a bounded,
-deterministic Interviewer and static Code Reviewer foundations only; no real
-LLM integration or other AI agents are implemented.
+configuration, or automatic execution retries. LangGraph includes bounded, deterministic Interviewer, static Code Reviewer,
+and Edge-Case Generator foundations. Real LLM integration and automatic
+verification/execution of generated tests are not implemented. Step 30 adds
+only deterministic coordination and explicit handoff validation; it does not
+add autonomous behavior or persistence for AI outputs.

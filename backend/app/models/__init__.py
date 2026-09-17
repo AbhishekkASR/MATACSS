@@ -9,6 +9,7 @@ from app.models.evaluation import EvaluationResult
 from app.models.execution_job import ExecutionJob
 from app.models.question import Question
 from app.models.submission import Submission
+from app.models.user import User, UserRole
 
 __all__ = [
     "Base",
@@ -20,4 +21,6 @@ __all__ = [
     "ExecutionJob",
     "Question",
     "Submission",
+    "User",
+    "UserRole",
 ]

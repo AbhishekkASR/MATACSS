@@ -7,7 +7,9 @@ checkpointer, provider SDK, or network call.
 The graph flow is:
 
 ```text
-START -> assessment_context -> interviewer -> code_reviewer -> END
+START -> assessment_context -> interviewer -> prepare_real_assessment_context
+     -> code_reviewer -> prepare_edge_case_context -> edge_case_generator
+     -> orchestrator -> feedback_aggregator -> END
 ```
 
 `AssessmentState` remains the sole application-level assessment snapshot.
@@ -21,5 +23,15 @@ Step 27 adds the bounded Interviewer Agent after `assessment_context`; it uses
 an injected deterministic provider and returns only a validated presentation
 decision. Step 28 adds the Code Reviewer Agent after the interviewer. It accepts
 only explicitly supplied review input and returns a validated static review (or
-an explicit `not_run` result). The Edge-Case Generator remains unimplemented.
-No real LLM integration is present.
+an explicit `not_run` result). Step 29 adds a bounded deterministic Edge-Case
+Generator after the reviewer. Step 30 adds explicit review and edge-case
+handoff preparation plus a typed deterministic coordinator result. Step 32 adds
+a bounded feedback aggregator that combines assessment, review, edge-case, and
+interviewer outputs while keeping official execution/evaluation results as the
+source of truth for correctness and score. The workflow remains deterministic,
+non-persistent, and non-executing.
+
+The graph never calls Docker, never writes to PostgreSQL, and never mutates the
+official test-case or evaluation records. Real LLM integration, autonomous
+behavior, AI-output persistence, and generated-case verification remain future
+work.

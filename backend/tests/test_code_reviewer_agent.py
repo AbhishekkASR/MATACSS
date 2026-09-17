@@ -205,10 +205,12 @@ def test_graph_preserves_interviewer_and_runs_explicit_review_input() -> None:
     provider = RecordingProvider()
     graph = build_assessment_graph(code_reviewer_provider=provider)
     graph_definition = graph.get_graph()
-    assert {"__start__", "assessment_context", "interviewer", "code_reviewer", "__end__"} <= set(
+    assert {"__start__", "assessment_context", "interviewer", "prepare_real_assessment_context",
+            "code_reviewer", "prepare_edge_case_context", "edge_case_generator",
+            "orchestrator", "feedback_aggregator", "__end__"} <= set(
         graph_definition.nodes
     )
-    assert len(graph_definition.edges) == 4
+    assert len(graph_definition.edges) == 9
     result = invoke_assessment_graph(
         state,
         code_reviewer_provider=provider,

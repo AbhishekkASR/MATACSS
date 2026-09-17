@@ -49,13 +49,15 @@ def assessment_state(status: InterviewStatus = InterviewStatus.ACTIVE) -> Assess
     )
 
 
-def test_graph_construction_has_context_interviewer_reviewer_and_terminal_path() -> None:
+def test_graph_construction_has_generator_and_terminal_path() -> None:
     graph = build_assessment_graph()
     graph_definition = graph.get_graph()
-    assert {"__start__", "assessment_context", "interviewer", "code_reviewer", "__end__"} <= set(
+    assert {"__start__", "assessment_context", "interviewer", "prepare_real_assessment_context",
+            "code_reviewer", "prepare_edge_case_context", "edge_case_generator",
+            "orchestrator", "feedback_aggregator", "__end__"} <= set(
         graph_definition.nodes
     )
-    assert len(graph_definition.edges) == 4
+    assert len(graph_definition.edges) == 9
 
 
 def test_graph_preserves_valid_active_assessment_state() -> None:
@@ -67,6 +69,7 @@ def test_graph_preserves_valid_active_assessment_state() -> None:
     assert result.assessment_state.current_question_id == state.current_question_id
     assert result.interviewer_decision.question_id == state.current_question_id
     assert result.code_review.review_status == "not_run"
+    assert result.edge_case_generation.question_id == state.current_question_id
 
 
 @pytest.mark.parametrize("status", [InterviewStatus.COMPLETED, InterviewStatus.CANCELLED])

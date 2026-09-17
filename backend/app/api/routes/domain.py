@@ -6,7 +6,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.database import get_db_session
+from app.core.security import get_current_active_user, require_roles
+from app.models.candidate import Candidate
+from app.models.interview import InterviewSession
+from app.models.user import User
 from app.schemas.domain import (
     CandidateCreateRequest,
     CandidateResponse,
@@ -53,6 +58,39 @@ from app.models.question import Question
 router = APIRouter(prefix="/api/v1", tags=["domain"])
 
 
+async def _ensure_candidate_access(
+    session: AsyncSession,
+    current_user: User | None,
+    candidate_id: UUID,
+) -> None:
+    if not settings.jwt_secret or current_user is None:
+        return
+    if current_user.role in {"admin", "interviewer"}:
+        return
+    candidate = await session.get(Candidate, candidate_id)
+    if candidate is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Candidate not found")
+    if candidate.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+
+
+async def _ensure_interview_access(
+    session: AsyncSession,
+    current_user: User | None,
+    interview_session_id: UUID,
+) -> None:
+    if not settings.jwt_secret or current_user is None:
+        return
+    if current_user.role in {"admin", "interviewer"}:
+        return
+    interview = await session.get(InterviewSession, interview_session_id)
+    if interview is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Interview session not found")
+    candidate = await session.get(Candidate, interview.candidate_id)
+    if candidate is None or candidate.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+
+
 def _interview_response(interview) -> InterviewResponse:
     return InterviewResponse(
         interview_session_id=interview.id,
@@ -68,7 +106,10 @@ def _interview_response(interview) -> InterviewResponse:
 async def create_candidate_route(
     request: CandidateCreateRequest,
     session: AsyncSession = Depends(get_db_session),
+    current_user: User | None = Depends(get_current_active_user),
 ) -> CandidateResponse:
+    if settings.jwt_secret and current_user is not None and current_user.role not in {"admin", "interviewer"}:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
     try:
         candidate = await create_candidate(session, request.name, request.email)
     except DuplicateCandidateEmailError as exc:
@@ -85,7 +126,10 @@ async def create_candidate_route(
 async def create_interview_route(
     request: InterviewCreateRequest,
     session: AsyncSession = Depends(get_db_session),
+    current_user: User | None = Depends(get_current_active_user),
 ) -> InterviewResponse:
+    if settings.jwt_secret and current_user is not None and current_user.role not in {"admin", "interviewer"}:
+        await _ensure_candidate_access(session, current_user, request.candidate_id)
     try:
         interview = await create_interview_session(
             session, request.candidate_id, status="active"
@@ -102,7 +146,9 @@ async def create_interview_route(
 async def get_interview_route(
     interview_session_id: UUID,
     session: AsyncSession = Depends(get_db_session),
+    current_user: User | None = Depends(get_current_active_user),
 ) -> InterviewProgressResponse:
+    await _ensure_interview_access(session, current_user, interview_session_id)
     try:
         interview, total_questions, submitted_questions, submission_count = (
             await get_interview_progress(session, interview_session_id)
@@ -126,7 +172,9 @@ async def get_interview_route(
 async def get_interview_results_route(
     interview_session_id: UUID,
     session: AsyncSession = Depends(get_db_session),
+    current_user: User | None = Depends(get_current_active_user),
 ) -> AssessmentResultsResponse:
+    await _ensure_interview_access(session, current_user, interview_session_id)
     try:
         interview, question_results = await get_assessment_results(
             session, interview_session_id
@@ -183,7 +231,10 @@ async def _close_interview(
 async def complete_interview_route(
     interview_session_id: UUID,
     session: AsyncSession = Depends(get_db_session),
+    current_user: User | None = Depends(get_current_active_user),
 ) -> InterviewResponse:
+    if settings.jwt_secret and current_user is not None and current_user.role not in {"admin", "interviewer"}:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
     return await _close_interview(interview_session_id, InterviewStatus.COMPLETED, session)
 
 
@@ -194,7 +245,10 @@ async def complete_interview_route(
 async def cancel_interview_route(
     interview_session_id: UUID,
     session: AsyncSession = Depends(get_db_session),
+    current_user: User | None = Depends(get_current_active_user),
 ) -> InterviewResponse:
+    if settings.jwt_secret and current_user is not None and current_user.role not in {"admin", "interviewer"}:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
     return await _close_interview(interview_session_id, InterviewStatus.CANCELLED, session)
 
 
@@ -292,7 +346,10 @@ async def assign_question_route(
     interview_session_id: UUID,
     request: InterviewQuestionAssignmentRequest,
     session: AsyncSession = Depends(get_db_session),
+    current_user: User | None = Depends(get_current_active_user),
 ) -> InterviewQuestionResponse:
+    if settings.jwt_secret and current_user is not None and current_user.role not in {"admin", "interviewer"}:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
     try:
         assignment = await assign_question(
             session,
@@ -325,7 +382,10 @@ async def assign_questions_bulk_route(
     interview_session_id: UUID,
     request: InterviewQuestionBulkAssignmentRequest,
     session: AsyncSession = Depends(get_db_session),
+    current_user: User | None = Depends(get_current_active_user),
 ) -> list[InterviewQuestionResponse]:
+    if settings.jwt_secret and current_user is not None and current_user.role not in {"admin", "interviewer"}:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
     try:
         assignments = await assign_questions(
             session,
@@ -367,7 +427,9 @@ async def assign_questions_bulk_route(
 async def list_questions_route(
     interview_session_id: UUID,
     session: AsyncSession = Depends(get_db_session),
+    current_user: User | None = Depends(get_current_active_user),
 ) -> list[InterviewQuestionResponse]:
+    await _ensure_interview_access(session, current_user, interview_session_id)
     try:
         assignments = await list_assigned_questions(session, interview_session_id)
     except InterviewSessionNotFoundError as exc:
@@ -382,7 +444,10 @@ async def list_questions_route(
 async def create_question_route(
     request: QuestionCreateRequest,
     session: AsyncSession = Depends(get_db_session),
+    current_user: User | None = Depends(get_current_active_user),
 ) -> QuestionResponse:
+    if settings.jwt_secret and current_user is not None and current_user.role not in {"admin", "interviewer"}:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
     question = await create_question(
         session,
         request.title,
@@ -421,7 +486,10 @@ async def create_test_case_route(
     question_id: UUID,
     request: QuestionTestCaseCreateRequest,
     session: AsyncSession = Depends(get_db_session),
+    current_user: User | None = Depends(get_current_active_user),
 ) -> QuestionTestCaseResponse:
+    if settings.jwt_secret and current_user is not None and current_user.role not in {"admin", "interviewer"}:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
     try:
         test_case = await create_question_test_case(
             session,
@@ -447,7 +515,10 @@ async def create_test_case_route(
 async def list_test_cases_route(
     question_id: UUID,
     session: AsyncSession = Depends(get_db_session),
+    current_user: User | None = Depends(get_current_active_user),
 ) -> list[QuestionTestCaseResponse]:
+    if settings.jwt_secret and current_user is not None and current_user.role not in {"admin", "interviewer"}:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
     try:
         test_cases = await list_question_test_cases(session, question_id)
     except QuestionNotFoundError as exc:

@@ -184,10 +184,12 @@ def test_graph_flow_runs_context_then_injected_interviewer() -> None:
     provider = RecordingProvider()
     graph = build_assessment_graph(provider)
     graph_definition = graph.get_graph()
-    assert {"__start__", "assessment_context", "interviewer", "code_reviewer", "__end__"} <= set(
+    assert {"__start__", "assessment_context", "interviewer", "prepare_real_assessment_context",
+            "code_reviewer", "prepare_edge_case_context", "edge_case_generator",
+            "orchestrator", "feedback_aggregator", "__end__"} <= set(
         graph_definition.nodes
     )
-    assert len(graph_definition.edges) == 4
+    assert len(graph_definition.edges) == 9
     result = invoke_assessment_graph(make_state(), provider)
     assert result.context_initialized is True
     assert result.interviewer_decision.decision_type == InterviewerDecisionType.PRESENT_QUESTION

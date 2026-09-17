@@ -6,9 +6,16 @@ from uuid import UUID
 
 from docker.errors import DockerException
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.database import get_db_session
+from app.core.security import get_current_active_user
+from app.models.candidate import Candidate
+from app.models.interview import InterviewSession
+from app.models.submission import Submission
+from app.models.user import User
 from app.schemas.submission import (
     CodeSubmissionRequest,
     CodeSubmissionResponse,
@@ -36,6 +43,23 @@ from app.services.evaluation_service import (
 
 router = APIRouter(prefix="/api/v1/submissions", tags=["submissions"])
 logger = logging.getLogger(__name__)
+
+
+async def _ensure_submission_access(
+    session: AsyncSession,
+    current_user: User | None,
+    interview_session_id: UUID,
+) -> None:
+    if not settings.jwt_secret or current_user is None:
+        return
+    if current_user.role in {"admin", "interviewer"}:
+        return
+    interview = await session.get(InterviewSession, interview_session_id)
+    if interview is None:
+        raise HTTPException(status_code=404, detail="Interview session not found")
+    candidate = await session.scalar(select(Candidate).where(Candidate.id == interview.candidate_id))
+    if candidate is None or candidate.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Forbidden")
 
 
 def get_sandbox_service() -> Callable[[], DockerSandboxService]:
@@ -67,8 +91,10 @@ def _evaluation_response(result) -> EvaluationResponse:
 async def submit_code(
     request: CodeSubmissionRequest,
     session: AsyncSession = Depends(get_db_session),
+    current_user: User | None = Depends(get_current_active_user),
 ) -> CodeSubmissionResponse:
     """Validate and enqueue a submission without executing Docker inline."""
+    await _ensure_submission_access(session, current_user, request.interview_session_id)
     try:
         submission_id, job_id = await enqueue_submission(request, session)
     except InterviewSessionNotFoundError as exc:
@@ -106,11 +132,13 @@ async def submit_code(
 async def get_submission_status_route(
     submission_id: UUID,
     session: AsyncSession = Depends(get_db_session),
+    current_user: User | None = Depends(get_current_active_user),
 ) -> SubmissionStatusResponse:
     try:
         submission, job = await get_submission_with_job(session, submission_id)
     except SubmissionNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Submission not found") from exc
+    await _ensure_submission_access(session, current_user, submission.interview_session_id)
     return SubmissionStatusResponse(
         submission_id=submission.id,
         job_id=job.id,
@@ -134,8 +162,12 @@ async def evaluate_submission_route(
     submission_id: UUID,
     sandbox_factory: Callable[[], DockerSandboxService] = Depends(get_sandbox_service),
     session: AsyncSession = Depends(get_db_session),
+    current_user: User | None = Depends(get_current_active_user),
 ) -> EvaluationResponse:
     try:
+        submission = await session.get(Submission, submission_id)
+        if submission is not None:
+            await _ensure_submission_access(session, current_user, submission.interview_session_id)
         result = await evaluate_submission(
             session, submission_id, sandbox_factory()
         )
@@ -160,11 +192,13 @@ async def evaluate_submission_route(
 async def get_evaluation_route(
     submission_id: UUID,
     session: AsyncSession = Depends(get_db_session),
+    current_user: User | None = Depends(get_current_active_user),
 ) -> EvaluationResponse:
     try:
-        await get_submission_for_evaluation(session, submission_id)
+        submission = await get_submission_for_evaluation(session, submission_id)
     except SubmissionNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Submission not found") from exc
+    await _ensure_submission_access(session, current_user, submission.interview_session_id)
     result = await get_evaluation_result(session, submission_id)
     if result is None:
         raise HTTPException(status_code=404, detail="Evaluation not found")

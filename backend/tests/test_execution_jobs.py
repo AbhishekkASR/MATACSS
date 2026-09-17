@@ -19,7 +19,7 @@ from app.models import Base, ExecutionJob, Submission
 from app.schemas.execution import ExecutionResult
 from app.services.execution_worker import process_next_execution_job
 from app.services.execution_worker import ExecutionWorker
-from app.services.execution_queue import find_stale_running_jobs
+from app.services.execution_queue import find_stale_running_jobs, mark_stale_running_jobs
 
 
 @pytest.fixture(scope="module")
@@ -240,3 +240,65 @@ def test_stale_running_detection_is_read_only(
             return len(stale), refreshed.status
 
     assert asyncio.run(inspect()) == (1, "running")
+
+
+def test_worker_hardening_run_loop_and_stale_job_recovery(
+    client: TestClient, sandbox_service: Mock, database
+) -> None:
+    interview, question = context(client)
+    submission = client.post(
+        "/api/v1/submissions",
+        json={
+            "interview_session_id": interview["interview_session_id"],
+            "question_id": question["question_id"],
+            "language": "python",
+            "source_code": "print(1)",
+        },
+    ).json()
+
+    async def inspect() -> tuple[int, str, str]:
+        async with database() as session:
+            job = await session.scalar(
+                select(ExecutionJob).where(
+                    ExecutionJob.submission_id == UUID(submission["submission_id"])
+                )
+            )
+            assert job is not None
+            job.status = "running"
+            job.started_at = datetime.now(timezone.utc) - timedelta(hours=2)
+            await session.commit()
+            stale = await mark_stale_running_jobs(session, timedelta(minutes=5))
+            refreshed = await session.get(ExecutionJob, job.id)
+            assert refreshed is not None
+            submission_record = await session.get(Submission, UUID(submission["submission_id"]))
+            assert submission_record is not None
+            return len(stale), refreshed.status, submission_record.status
+
+    result = asyncio.run(inspect())
+    assert result[1] == "failed"
+    assert result[2] == "sandbox_error"
+    assert result[0] >= 1
+
+
+def test_worker_graceful_stop_event_stops_loop(
+    client: TestClient, sandbox_service: Mock, database
+) -> None:
+    interview, question = context(client)
+    client.post(
+        "/api/v1/submissions",
+        json={
+            "interview_session_id": interview["interview_session_id"],
+            "question_id": question["question_id"],
+            "language": "python",
+            "source_code": "print(2)",
+        },
+    )
+
+    async def inspect() -> bool:
+        async with database() as session:
+            worker = ExecutionWorker(sandbox_service, poll_interval_seconds=0.0, batch_size=1)
+            await worker.stop()
+            processed = await worker.run_until_idle(session, max_jobs=1)
+            return processed == 0 and worker.is_stopped
+
+    assert asyncio.run(inspect()) is True
