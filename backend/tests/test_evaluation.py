@@ -3,9 +3,10 @@
 import asyncio
 from collections.abc import AsyncGenerator
 from unittest.mock import Mock
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
+from sqlalchemy import select
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
@@ -13,7 +14,7 @@ from sqlalchemy.pool import StaticPool
 from app.api.routes.submissions import get_sandbox_service
 from app.core.database import get_db_session
 from app.main import app
-from app.models import Base, QuestionStatus
+from app.models import Base, Question, QuestionStatus, QuestionTestCase
 from app.schemas.execution import ExecutionResult
 from app.services.execution_worker import process_next_execution_job
 from tests.question_helpers import set_question_status
@@ -104,9 +105,23 @@ def test_test_case_order_and_idempotent_evaluation(
             json={"stdin": stdin, "expected_stdout": f"{stdin}\n"},
         )
         assert response.status_code == 201
+
+    async def mark_first_case_sample() -> None:
+        async with database() as session:
+            sample = await session.scalar(
+                select(QuestionTestCase).where(
+                    QuestionTestCase.question_id == UUID(question["question_id"]),
+                    QuestionTestCase.stdin == "one",
+                )
+            )
+            assert sample is not None
+            sample.is_sample = True
+            await session.commit()
+
+    asyncio.run(mark_first_case_sample())
     cases = client.get(f"/api/v1/questions/{question['question_id']}/test-cases")
     assert cases.status_code == 200
-    assert [item["stdin"] for item in cases.json()] == ["one", "two"]
+    assert [item["stdin"] for item in cases.json()] == ["one"]
 
     submission = client.post(
         "/api/v1/submissions",
@@ -182,6 +197,70 @@ def test_partial_pass_and_stdout_normalization(
     assert result.json()["passed_test_cases"] == 1
     assert result.json()["failed_test_cases"] == 1
     assert result.json()["score"] == 50
+
+
+def test_functional_case_scores_return_value_against_official_output(
+    client: TestClient, sandbox_service: Mock, database
+) -> None:
+    interview, question, _ = context(client)
+    case = client.post(
+        f"/api/v1/questions/{question['question_id']}/test-cases",
+        json={
+            "stdin": "[[1, 2], [3, 4]]",
+            "expected_stdout": "[1, 4]",
+        },
+    )
+    assert case.status_code == 201
+
+    async def mark_functional() -> None:
+        async with database() as session:
+            question_id = UUID(question["question_id"])
+            stored_question = await session.get(Question, question_id)
+            stored_question.starter_code = (
+                "class Solution:\n"
+                "    def zigzagTraversal(self, grid):\n"
+                "        pass\n"
+            )
+            test_case = await session.scalar(
+                select(QuestionTestCase).where(
+                    QuestionTestCase.question_id == question_id
+                )
+            )
+            test_case.is_functional = True
+            await session.commit()
+
+    asyncio.run(mark_functional())
+    sandbox_service.execute.side_effect = lambda **kwargs: ExecutionResult(
+        status="success",
+        stdout="[1,4]",
+        exit_code=0,
+        execution_time_ms=2,
+    )
+    submission = client.post(
+        "/api/v1/submissions",
+        json={
+            "interview_session_id": interview["interview_session_id"],
+            "question_id": question["question_id"],
+            "language": "python",
+            "source_code": (
+                "class Solution:\n"
+                "    def zigzagTraversal(self, grid):\n"
+                "        return [grid[0][0], grid[1][1]]\n"
+            ),
+        },
+    ).json()
+    process_job(database, sandbox_service)
+
+    result = client.post(
+        f"/api/v1/submissions/{submission['submission_id']}/evaluate"
+    )
+
+    assert result.status_code == 200
+    assert result.json()["passed_test_cases"] == 1
+    assert result.json()["score"] == 100
+    assert sandbox_service.execute.call_args.kwargs["functional_method"] == (
+        "zigzagTraversal"
+    )
 
 
 def test_missing_test_case_question_and_submission_return_404(

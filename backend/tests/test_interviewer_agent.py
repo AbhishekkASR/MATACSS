@@ -18,6 +18,7 @@ from app.orchestration.interviewer import (
     InterviewerAgentError,
     InterviewerDecision,
     InterviewerDecisionType,
+    InterviewerNextStepAction,
     InterviewerProvider,
     InterviewerProviderSelection,
 )
@@ -104,6 +105,20 @@ class NonCurrentAssignedProvider:
         )
 
 
+class ContinuationProvider:
+    def select_question(self, assessment_state: AssessmentState) -> InterviewerProviderSelection:
+        return InterviewerProviderSelection(
+            selected_question_id=None,
+            reason="The completed attempt supports continuing with another question.",
+            next_step={
+                "action": "continue",
+                "topic": "graphs",
+                "difficulty": "medium",
+                "language": "python",
+            },
+        )
+
+
 def test_active_agent_selects_only_current_assigned_question() -> None:
     state = make_state(first_attempted=True)
     provider = RecordingProvider()
@@ -142,6 +157,24 @@ def test_fully_attempted_active_assessment_returns_safe_non_question_decision() 
     )
     assert decision.decision_type == InterviewerDecisionType.ALL_QUESTIONS_ATTEMPTED
     assert decision.question_id is None
+    assert decision.next_step.action == InterviewerNextStepAction.FINISH
+
+
+def test_fully_attempted_assessment_accepts_recommendation_without_question_id() -> None:
+    decision = InterviewerAgent(ContinuationProvider()).decide(
+        make_state(question_count=1, first_attempted=True)
+    )
+    assert decision.decision_type == InterviewerDecisionType.ALL_QUESTIONS_ATTEMPTED
+    assert decision.question_id is None
+    assert decision.next_step.action == InterviewerNextStepAction.CONTINUE
+    assert decision.next_step.topic == "graphs"
+
+
+def test_fully_attempted_assessment_rejects_a_selected_question() -> None:
+    with pytest.raises(InterviewerAgentError, match="when no assigned question remains"):
+        InterviewerAgent(InventedQuestionProvider()).decide(
+            make_state(question_count=1, first_attempted=True)
+        )
 
 
 @pytest.mark.parametrize("status", [InterviewStatus.COMPLETED, InterviewStatus.CANCELLED])
@@ -193,6 +226,7 @@ def test_graph_flow_runs_context_then_injected_interviewer() -> None:
     result = invoke_assessment_graph(make_state(), provider)
     assert result.context_initialized is True
     assert result.interviewer_decision.decision_type == InterviewerDecisionType.PRESENT_QUESTION
+    assert result.interviewer_decision.next_step.action == InterviewerNextStepAction.CONTINUE
     assert len(provider.received) == 1
 
 

@@ -44,6 +44,9 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); o
 .difficulty { display: inline-flex; margin-top: 22px; padding: 5px 9px; border-radius: 5px; background: var(--accent-soft); color: var(--accent); font-size: 11px; font-weight: 700; }
 .expected-language { display: flex; justify-content: space-between; margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; }
 .expected-language strong { color: var(--text); text-transform: capitalize; }
+.question-contract { display: grid; gap: 14px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border); }
+.question-contract h2 { margin-bottom: 6px; color: var(--muted); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }
+.question-contract p { color: var(--text); font: 12px/1.6 monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
 .workflow-card { padding: 18px; }
 .workflow-card p { margin-top: 10px; color: var(--muted); font-size: 12px; line-height: 1.6; }
 .coding-column { display: flex; min-width: 0; flex-direction: column; gap: 12px; }
@@ -82,4 +85,47 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); o
 .result-row div:first-child { display: grid; gap: 6px; }
 .result-row span { color: var(--muted); font-size: 12px; }
 .result-score { color: var(--accent); font-size: 12px; font-weight: 700; text-align: right; }
+.agent-feedback-panel { display: grid; gap: 14px; margin-top: 24px; padding-top: 22px; border-top: 1px solid var(--border); }
+.agent-feedback-heading, .agent-feedback-entry-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.agent-feedback-heading h2 { margin-top: 8px; font-size: 20px; }
+.advisory-badge { padding: 6px 9px; border: 1px solid rgba(122, 162, 247, .35); border-radius: 5px; color: var(--blue); font-size: 10px; }
+.agent-feedback-disclaimer, .agent-feedback-empty { color: var(--muted); font-size: 12px; line-height: 1.6; }
+.agent-feedback-list { display: grid; gap: 10px; }
+.agent-feedback-entry { display: grid; gap: 12px; padding: 14px; border: 1px solid var(--border); border-radius: 7px; background: var(--panel-raised); }
+.agent-feedback-entry-heading strong { font-size: 12px; }
+.feedback-status { font-size: 11px; }
+.feedback-status-completed { color: var(--blue); }
+.feedback-status-failed { color: var(--muted); }
+.agent-feedback-entry ul { display: grid; gap: 8px; padding-left: 18px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.auth-page { display: grid; min-height: 100vh; place-items: center; padding: 24px; background: radial-gradient(circle at 80% -20%, #17243a 0, transparent 42%), var(--bg); }
+.auth-card { display: grid; width: min(100%, 450px); gap: 18px; padding: 30px; border: 1px solid var(--border); border-radius: 12px; background: var(--panel); }
+.auth-brand { margin-bottom: 14px; }
+.auth-card h1, .assessment-entry h1 { font-size: 25px; letter-spacing: -.02em; }
+.auth-description, .session-security-note, .assessment-entry > p { color: var(--muted); font-size: 13px; line-height: 1.6; }
+.auth-form { display: grid; gap: 14px; }
+.auth-form label, .assessment-entry-form label { display: grid; gap: 7px; color: var(--muted); font-size: 12px; }
+.auth-form input, .assessment-entry-form input { width: 100%; padding: 11px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel-raised); color: var(--text); font: inherit; }
+.auth-form input:focus-visible, .assessment-entry-form input:focus-visible, .stdin-control textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.session-security-note { padding-top: 14px; border-top: 1px solid var(--border); font-size: 11px; }
+.assessment-entry { display: grid; gap: 16px; width: min(calc(100% - 36px), 620px); margin: 12vh auto; padding: 28px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); }
+.assessment-entry-form { display: grid; gap: 10px; }
+.candidate-assessment-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.assessor-session-note { padding-top: 16px; border-top: 1px solid var(--border); }
+.assessment-entry-form .run-button { justify-self: start; }
+.assessment-context { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; max-width: 1500px; margin: 0 auto; padding: 14px 24px 0; color: var(--muted); font-size: 12px; }
+.assessment-context code { color: var(--text); font-family: monospace; }
+.assessment-status { padding: 4px 8px; border-radius: 5px; background: var(--accent-soft); color: var(--accent); text-transform: capitalize; }
+.assessment-status-completed { background: rgba(122, 162, 247, .13); color: var(--blue); }
+.assessment-status-cancelled { background: rgba(247, 118, 142, .1); color: var(--danger); }
+.assessment-context .secondary-button { margin-left: auto; }
+.page-error { max-width: 1452px; margin: 14px auto 0; }
+.signed-in-user { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.run-actions { display: flex; align-items: center; gap: 8px; }
+.evaluation-panel { display: grid; gap: 14px; padding: 18px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); }
+.evaluation-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.evaluation-header h2 { margin-top: 8px; font-size: 24px; }
+.evaluation-note, .evaluation-summary { color: var(--muted); font-size: 12px; line-height: 1.5; }
+.results-back { margin-top: 16px; }
+button:disabled { cursor: not-allowed; opacity: .5; }
 @media (max-width: 800px) { .topbar { padding: 0 18px; } .session-status { display: none; } .workspace-grid { grid-template-columns: 1fr; padding: 14px; } .editor-shell { height: 52vh; } .output-content { grid-template-columns: 1fr; } }
+@media (max-width: 600px) { .assessment-context { align-items: flex-start; flex-direction: column; padding-inline: 14px; } .assessment-context .secondary-button { margin-left: 0; } .auth-card { padding: 22px; } .results-header { align-items: flex-start; flex-direction: column; } .evaluation-header { align-items: flex-start; flex-direction: column; } }

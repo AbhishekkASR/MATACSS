@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncGenerator
+from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
@@ -19,7 +20,8 @@ import app.core.database as database_module
 import app.core.security as security
 import app.main as main_module
 from app.core.database import get_db_session
-from app.models import Base, Candidate
+from app.models import Base, Candidate, Question, QuestionStatus, QuestionTestCase, UserRole
+from app.services.auth_service import create_user
 
 
 @pytest.fixture
@@ -82,6 +84,7 @@ def test_login_and_me(configured_client: TestClient) -> None:
     )
     assert register.status_code == 201
     assert register.json()["email"] == "alice@example.com"
+    assert register.json()["role"] == "candidate"
 
     token = configured_client.post(
         "/api/v1/auth/login",
@@ -98,6 +101,21 @@ def test_login_and_me(configured_client: TestClient) -> None:
     )
     assert me.status_code == 200
     assert me.json()["email"] == "alice@example.com"
+
+
+def test_registration_rejects_client_selected_privileged_role(
+    configured_client: TestClient,
+) -> None:
+    response = configured_client.post(
+        "/api/v1/auth/register",
+        json={
+            "name": "Attempted Admin",
+            "email": "attempted-admin@example.com",
+            "password": "secure-password",
+            "role": "admin",
+        },
+    )
+    assert response.status_code == 422
 
 
 def test_invalid_token_is_rejected(configured_client: TestClient) -> None:
@@ -164,3 +182,232 @@ def test_candidate_cannot_access_other_candidate_interview(
         headers={"Authorization": f"Bearer {token_b.json()['access_token']}"},
     )
     assert forbidden.status_code == 403
+
+    forbidden_completion = configured_client.post(
+        f"/api/v1/interviews/{interview_id}/complete",
+        headers={"Authorization": f"Bearer {token_b.json()['access_token']}"},
+    )
+    assert forbidden_completion.status_code == 403
+
+    completed = configured_client.post(
+        f"/api/v1/interviews/{interview_id}/complete",
+        headers={"Authorization": f"Bearer {token_a.json()['access_token']}"},
+    )
+    assert completed.status_code == 200
+    assert completed.json()["status"] == "completed"
+
+    repeated_completion = configured_client.post(
+        f"/api/v1/interviews/{interview_id}/complete",
+        headers={"Authorization": f"Bearer {token_a.json()['access_token']}"},
+    )
+    assert repeated_completion.status_code == 409
+
+
+def test_submission_attempt_routes_enforce_auth_and_interview_ownership(
+    configured_client: TestClient,
+) -> None:
+    register_a = configured_client.post(
+        "/api/v1/auth/register",
+        json={
+            "name": "Owner Candidate",
+            "email": "owner@example.com",
+            "password": "strong-pass1",
+        },
+    )
+    register_b = configured_client.post(
+        "/api/v1/auth/register",
+        json={
+            "name": "Other Candidate",
+            "email": "other@example.com",
+            "password": "strong-pass2",
+        },
+    )
+    assert register_a.status_code == register_b.status_code == 201
+
+    async def create_admin() -> None:
+        async with database_module.async_session_factory() as session:
+            await create_user(
+                session,
+                "admin@example.com",
+                "secure-password",
+                role=UserRole.ADMIN,
+            )
+
+    asyncio.run(create_admin())
+    tokens = {}
+    for email, password in (
+        ("owner@example.com", "strong-pass1"),
+        ("other@example.com", "strong-pass2"),
+        ("admin@example.com", "secure-password"),
+    ):
+        token = configured_client.post(
+            "/api/v1/auth/login",
+            json={"email": email, "password": password},
+        )
+        assert token.status_code == 200
+        tokens[email] = {"Authorization": f"Bearer {token.json()['access_token']}"}
+
+    async def get_candidate_id() -> str:
+        async with database_module.async_session_factory() as session:
+            candidate = await session.scalar(
+                select(Candidate).where(Candidate.email == "owner@example.com")
+            )
+            assert candidate is not None
+            return str(candidate.id)
+
+    interview = configured_client.post(
+        "/api/v1/interviews",
+        json={"candidate_id": asyncio.run(get_candidate_id())},
+        headers=tokens["owner@example.com"],
+    )
+    assert interview.status_code == 201
+    interview_id = interview.json()["interview_session_id"]
+
+    question_response = configured_client.post(
+        "/api/v1/questions",
+        json={
+            "title": "Private submission question",
+            "description": "Question description",
+            "difficulty": "easy",
+            "expected_language": "python",
+        },
+        headers=tokens["admin@example.com"],
+    )
+    assert question_response.status_code == 201
+    question_id = question_response.json()["question_id"]
+
+    async def activate_question() -> None:
+        async with database_module.async_session_factory() as session:
+            question = await session.get(Question, UUID(question_id))
+            assert question is not None
+            question.status = QuestionStatus.ACTIVE
+            await session.commit()
+
+    asyncio.run(activate_question())
+    assignment = configured_client.post(
+        f"/api/v1/interviews/{interview_id}/questions",
+        json={"question_id": question_id, "sequence_number": 1},
+        headers=tokens["admin@example.com"],
+    )
+    assert assignment.status_code == 201
+
+    submission = configured_client.post(
+        "/api/v1/submissions",
+        json={
+            "interview_session_id": interview_id,
+            "question_id": question_id,
+            "language": "python",
+            "source_code": "print('private source')",
+        },
+        headers=tokens["owner@example.com"],
+    )
+    assert submission.status_code == 200
+
+    history_url = (
+        f"/api/v1/interviews/{interview_id}/questions/{question_id}/submissions"
+    )
+    latest_url = (
+        f"/api/v1/interviews/{interview_id}/questions/{question_id}/latest-submission"
+    )
+    for url in (history_url, latest_url):
+        assert configured_client.get(url).status_code == 401
+        assert (
+            configured_client.get(url, headers=tokens["other@example.com"]).status_code
+            == 403
+        )
+
+    history = configured_client.get(
+        history_url, headers=tokens["owner@example.com"]
+    )
+    latest = configured_client.get(latest_url, headers=tokens["owner@example.com"])
+    assert history.status_code == latest.status_code == 200
+    assert history.json()[0]["source_code"] == "print('private source')"
+    assert latest.json()["source_code"] == "print('private source')"
+    assert configured_client.get(
+        history_url, headers=tokens["admin@example.com"]
+    ).status_code == 200
+
+
+def test_test_case_listing_hides_private_cases_from_candidates(
+    configured_client: TestClient,
+) -> None:
+    async def create_admin() -> None:
+        async with database_module.async_session_factory() as session:
+            await create_user(
+                session,
+                "case-admin@example.com",
+                "secure-password",
+                role=UserRole.ADMIN,
+            )
+
+    asyncio.run(create_admin())
+    admin_login = configured_client.post(
+        "/api/v1/auth/login",
+        json={"email": "case-admin@example.com", "password": "secure-password"},
+    )
+    admin_headers = {
+        "Authorization": f"Bearer {admin_login.json()['access_token']}"
+    }
+    question = configured_client.post(
+        "/api/v1/questions",
+        json={
+            "title": "Case visibility question",
+            "description": "Question description",
+            "difficulty": "easy",
+            "expected_language": "python",
+        },
+        headers=admin_headers,
+    )
+    assert question.status_code == 201
+    question_id = question.json()["question_id"]
+
+    hidden_case = configured_client.post(
+        f"/api/v1/questions/{question_id}/test-cases",
+        json={"stdin": "hidden input", "expected_stdout": "hidden output"},
+        headers=admin_headers,
+    )
+    assert hidden_case.status_code == 201
+
+    async def add_sample_case() -> None:
+        async with database_module.async_session_factory() as session:
+            session.add(
+                QuestionTestCase(
+                    question_id=UUID(question_id),
+                    stdin="sample input",
+                    expected_stdout="sample output",
+                    is_sample=True,
+                )
+            )
+            await session.commit()
+
+    asyncio.run(add_sample_case())
+    candidate = configured_client.post(
+        "/api/v1/auth/register",
+        json={
+            "name": "Case Candidate",
+            "email": "case-candidate@example.com",
+            "password": "strong-pass3",
+        },
+    )
+    assert candidate.status_code == 201
+    candidate_login = configured_client.post(
+        "/api/v1/auth/login",
+        json={"email": "case-candidate@example.com", "password": "strong-pass3"},
+    )
+    candidate_headers = {
+        "Authorization": f"Bearer {candidate_login.json()['access_token']}"
+    }
+
+    candidate_cases = configured_client.get(
+        f"/api/v1/questions/{question_id}/test-cases",
+        headers=candidate_headers,
+    )
+    admin_cases = configured_client.get(
+        f"/api/v1/questions/{question_id}/test-cases",
+        headers=admin_headers,
+    )
+    assert candidate_cases.status_code == admin_cases.status_code == 200
+    assert [(item["stdin"], item["expected_stdout"]) for item in candidate_cases.json()] == [
+        ("sample input", "sample output")
+    ]
+    assert len(admin_cases.json()) == 2

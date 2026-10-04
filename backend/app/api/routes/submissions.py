@@ -40,6 +40,7 @@ from app.services.evaluation_service import (
     evaluate_submission,
     SubmissionExecutionIncompleteError,
 )
+from app.services.assessment_feedback_service import generate_submission_feedback
 
 router = APIRouter(prefix="/api/v1/submissions", tags=["submissions"])
 logger = logging.getLogger(__name__)
@@ -182,7 +183,18 @@ async def evaluate_submission_route(
         raise HTTPException(
             status_code=500, detail="Sandbox evaluation failed."
         ) from exc
-    return _evaluation_response(result)
+    response = _evaluation_response(result)
+    try:
+        await generate_submission_feedback(session, submission_id)
+    except Exception:
+        logger.warning(
+            "Advisory feedback failed after official evaluation was persisted",
+            extra={
+                "event": "assessment_feedback_unavailable",
+                "submission_id": str(submission_id),
+            },
+        )
+    return response
 
 
 @router.get(

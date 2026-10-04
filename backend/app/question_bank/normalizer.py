@@ -25,6 +25,11 @@ from app.question_bank.decoder import (
     decode_private_test_cases,
     decode_public_test_cases,
 )
+from app.question_bank.functional import (
+    FunctionalFormatError,
+    solution_method,
+    validate_functional_case,
+)
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -172,7 +177,11 @@ def normalize_record(record: dict) -> NormalizedQuestion:
     # ── Languages and status ──────────────────────────────────────────────────
     if is_functional_platform:
         supported_languages = LEETCODE_SUPPORTED_LANGUAGES
-        status = "draft"  # Requires functional harness before validation
+        status = _validate_leetcode_functional_status(
+            starter_code=record.get("starter_code"),
+            test_cases=test_cases,
+            warnings=warnings,
+        )
     else:
         supported_languages = ALL_SUPPORTED_LANGUAGES
         status = _validate_atcoder_status(test_cases, warnings)
@@ -309,6 +318,31 @@ def _validate_atcoder_status(
         return "draft"
     # All stdout values must be non-empty for basic sanity
     # (Empty string is valid for some problems — only flag None/missing)
+    return "validated"
+
+
+def _validate_leetcode_functional_status(
+    *,
+    starter_code: object,
+    test_cases: list[NormalizedTestCase],
+    warnings: list[str],
+) -> str:
+    """Advance only supported Python functional records to validated."""
+    if not any(not tc.is_sample for tc in test_cases):
+        warnings.append("No private functional test cases; question remains draft")
+        return "draft"
+    if not test_cases or any(not tc.is_functional for tc in test_cases):
+        warnings.append("Unsupported LeetCode test type; question remains draft")
+        return "draft"
+    try:
+        method = solution_method(starter_code if isinstance(starter_code, str) else None)
+        for test_case in test_cases:
+            validate_functional_case(
+                method, test_case.stdin, test_case.expected_stdout
+            )
+    except FunctionalFormatError as exc:
+        warnings.append(f"Unsupported functional question ({exc}); question remains draft")
+        return "draft"
     return "validated"
 
 

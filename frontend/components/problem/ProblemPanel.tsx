@@ -23,8 +23,30 @@ export function ProblemPanel({
       <span className="difficulty">{problem.difficulty}</span>
       <div className="expected-language">
         <span>Expected language</span>
-        <strong>{problem.expectedLanguage}</strong>
+        <strong>{problem.expectedLanguage ?? "Any supported language"}</strong>
       </div>
+      {(problem.inputFormat || problem.outputFormat || problem.constraints) && (
+        <div className="question-contract">
+          {problem.inputFormat && (
+            <div>
+              <h2>Input format</h2>
+              <p>{problem.inputFormat}</p>
+            </div>
+          )}
+          {problem.outputFormat && (
+            <div>
+              <h2>Output format</h2>
+              <p>{problem.outputFormat}</p>
+            </div>
+          )}
+          {problem.constraints && (
+            <div>
+              <h2>Constraints</h2>
+              <p>{problem.constraints}</p>
+            </div>
+          )}
+        </div>
+      )}
     </section>
   );
 }

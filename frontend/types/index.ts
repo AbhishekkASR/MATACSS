@@ -17,6 +17,22 @@ export interface Candidate {
   created_at: string;
 }
 
+export type UserRole = "admin" | "interviewer" | "candidate";
+
+export interface AuthenticatedUser {
+  user_id: string;
+  email: string;
+  role: UserRole;
+  active: boolean;
+  created_at: string;
+}
+
+export interface AuthToken {
+  access_token: string;
+  token_type: "bearer";
+  expires_in: number;
+}
+
 export interface InterviewSession {
   interview_session_id: string;
   candidate_id: string;
@@ -30,6 +46,36 @@ export interface InterviewSession {
   submission_count: number;
 }
 
+export interface InterviewStatusResponse {
+  interview_session_id: string;
+  candidate_id: string;
+  status: InterviewStatus;
+  started_at: string | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export interface AssessmentStartResponse {
+  interview_session_id: string;
+  candidate_id: string;
+  status: InterviewStatus;
+  current_question: AssessmentQuestionDetails | null;
+}
+
+export interface AssessmentQuestionDetails {
+  question_id: string;
+  title: string;
+  description: string;
+  difficulty: "easy" | "medium" | "hard";
+  expected_language: Language | null;
+  input_format: string | null;
+  output_format: string | null;
+  constraints_text: string | null;
+  supported_languages: Language[] | null;
+  starter_code: string | null;
+  status: string;
+}
+
 export interface Question {
   question_id: string;
   title: string;
@@ -41,6 +87,11 @@ export interface Question {
 
 export interface AssignedQuestion extends Question {
   sequence_number: number;
+  input_format?: string | null;
+  output_format?: string | null;
+  constraints_text?: string | null;
+  starter_code?: string | null;
+  supported_languages?: Language[] | null;
 }
 
 export interface CodeSubmissionRequest {
@@ -130,6 +181,25 @@ export interface QuestionResult {
   total_test_cases: number;
 }
 
+export type AgentFeedbackValue =
+  | string
+  | number
+  | boolean
+  | null
+  | AgentFeedbackValue[]
+  | { [key: string]: AgentFeedbackValue };
+
+export interface AgentFeedback {
+  submission_id: string;
+  status: "completed" | "failed";
+  interviewer_decision: AgentFeedbackValue;
+  code_review: AgentFeedbackValue;
+  edge_case_generation: AgentFeedbackValue;
+  feedback: AgentFeedbackValue;
+  failure_kind: string | null;
+  created_at: string;
+}
+
 export interface AssessmentResults {
   interview_session_id: string;
   interview_status: InterviewStatus;
@@ -141,13 +211,17 @@ export interface AssessmentResults {
   overall_score: number | null;
   status: "scored" | "not_scored";
   questions: QuestionResult[];
+  agent_feedback?: AgentFeedback[];
 }
 
 export interface Problem {
   title: string;
   description: string;
   difficulty: string;
-  expectedLanguage: Language;
+  expectedLanguage: Language | null;
+  inputFormat?: string | null;
+  outputFormat?: string | null;
+  constraints?: string | null;
 }
 
 export interface ExecutionOutput {

@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.database import get_db_session
 from app.core.security import create_access_token, get_current_active_user
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.auth import TokenResponse, UserCreateRequest, UserLoginRequest, UserResponse
 from app.services.auth_service import (
     InvalidCredentialsError,
@@ -38,7 +38,7 @@ async def register_user_route(
             name=request.name,
             email=request.email,
             password=request.password,
-            role=request.role,
+            role=UserRole.CANDIDATE,
         )
     except UserAlreadyExistsError as exc:
         raise HTTPException(

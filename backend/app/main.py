@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes.auth import router as auth_router
 from app.api.routes.health import router as health_router
 from app.api.routes.domain import router as domain_router
+from app.api.routes.question_engine import router as question_engine_router
 from app.api.routes.submissions import router as submissions_router
 from app.core.config import settings
 from app.core.logging import configure_logging, reset_correlation_id, sanitize_exception_message, set_correlation_id
@@ -80,6 +81,7 @@ app.add_middleware(
 app.include_router(health_router)
 app.include_router(auth_router)
 app.include_router(domain_router)
+app.include_router(question_engine_router)
 app.include_router(submissions_router)
 
 if __name__ == "__main__":

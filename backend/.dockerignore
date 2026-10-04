@@ -1,0 +1,15 @@
+.env*
+production.env.example
+.venv/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+docker-client-certs/
+*.pem
+*.key
+*.crt
+*.py[cod]
+*.db
+*.db-*
+.git/

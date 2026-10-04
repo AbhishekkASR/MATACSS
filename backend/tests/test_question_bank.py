@@ -392,8 +392,29 @@ class TestAtCoderNormalization:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class TestLeetCodeNormalization:
-    def test_leetcode_status_is_draft(self):
+    def test_supported_leetcode_functional_question_is_validated(self):
         rec = _make_leetcode_record()
+        nq = normalize_record(rec)
+        assert nq.status == "validated"
+
+    def test_unsupported_leetcode_functional_question_stays_draft(self):
+        rec = _make_leetcode_record(
+            public=[
+                {
+                    "input": "not a literal",
+                    "output": "[]",
+                    "testtype": "functional",
+                }
+            ]
+        )
+        nq = normalize_record(rec)
+        assert nq.status == "draft"
+        assert any("Unsupported functional question" in warning for warning in nq.warnings)
+
+    def test_nonfunctional_leetcode_test_type_stays_draft(self):
+        rec = _make_leetcode_record(
+            public=[{"input": "1", "output": "1", "testtype": "stdin"}]
+        )
         nq = normalize_record(rec)
         assert nq.status == "draft"
 
@@ -674,10 +695,10 @@ class TestValidationStatus:
         nq = normalize_record(rec)
         assert nq.status == "draft"
 
-    def test_leetcode_always_draft(self):
+    def test_supported_leetcode_functional_cases_are_validated(self):
         rec = _make_leetcode_record()
         nq = normalize_record(rec)
-        assert nq.status == "draft"
+        assert nq.status == "validated"
 
     def test_valid_lifecycle_values(self):
         for diff in ("easy", "medium", "hard"):

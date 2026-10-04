@@ -97,6 +97,8 @@ async def create_interview_session(
     session: AsyncSession,
     candidate_id: UUID,
     status: str = InterviewStatus.ACTIVE,
+    *,
+    commit: bool = True,
 ) -> InterviewSession:
     candidate = await session.scalar(
         select(Candidate).where(Candidate.id == candidate_id)
@@ -110,11 +112,16 @@ async def create_interview_session(
     )
     session.add(interview)
     try:
-        await session.commit()
+        if commit:
+            await session.commit()
+        else:
+            await session.flush()
     except IntegrityError:
-        await session.rollback()
+        if commit:
+            await session.rollback()
         raise
-    await session.refresh(interview)
+    if commit:
+        await session.refresh(interview)
     return interview
 
 
@@ -171,6 +178,8 @@ async def assign_question(
     interview_session_id: UUID,
     question_id: UUID,
     sequence_number: int,
+    *,
+    commit: bool = True,
 ) -> InterviewQuestion:
     await _get_active_interview(session, interview_session_id)
     question = await session.scalar(select(Question).where(Question.id == question_id))
@@ -186,11 +195,16 @@ async def assign_question(
     )
     session.add(assignment)
     try:
-        await session.commit()
+        if commit:
+            await session.commit()
+        else:
+            await session.flush()
     except IntegrityError as exc:
-        await session.rollback()
+        if commit:
+            await session.rollback()
         raise InterviewQuestionAssignmentConflictError from exc
-    await session.refresh(assignment)
+    if commit:
+        await session.refresh(assignment)
     return assignment
 
 

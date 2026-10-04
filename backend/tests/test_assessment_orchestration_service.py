@@ -1,6 +1,7 @@
 """Step 31 coverage for persisted-assessment orchestration preparation."""
 
 import asyncio
+import json
 from datetime import datetime, timezone
 from types import SimpleNamespace
 from uuid import uuid4
@@ -8,7 +9,10 @@ from uuid import uuid4
 import pytest
 
 from app.models.interview import InterviewStatus
-from app.orchestration.assessment_graph import invoke_assessment_graph
+from app.orchestration.code_reviewer import DeterministicCodeReviewerProvider
+from app.orchestration.edge_case_generator import DeterministicEdgeCaseGeneratorProvider
+from app.orchestration.interviewer import DeterministicInterviewerProvider
+from app.core.llm_provider import LLMMessage, LLMResponse
 from app.services import assessment_orchestration_service as service
 from app.services.assessment_orchestration_service import (
     AssessmentOrchestrationPreparationError,
@@ -157,7 +161,7 @@ def test_inactive_assessment_does_not_load_submission_or_prepare_review(
     assert context.edge_case_input is None
 
 
-def test_real_context_runs_existing_graph_deterministically(monkeypatch) -> None:
+def test_real_context_supports_injected_deterministic_providers(monkeypatch) -> None:
     state = make_state()
     patch_state(monkeypatch, state)
 
@@ -165,7 +169,90 @@ def test_real_context_runs_existing_graph_deterministically(monkeypatch) -> None
         raise service.SubmissionAttemptNotFoundError
 
     monkeypatch.setattr(service, "get_latest_submission", no_submission)
-    first = run(run_real_assessment_orchestration(object(), state.interview_session_id))
-    second = run(run_real_assessment_orchestration(object(), state.interview_session_id))
+    providers = {
+        "interviewer_provider": DeterministicInterviewerProvider(),
+        "code_reviewer_provider": DeterministicCodeReviewerProvider(),
+        "edge_case_generator_provider": DeterministicEdgeCaseGeneratorProvider(),
+    }
+    first = run(
+        run_real_assessment_orchestration(
+            object(), state.interview_session_id, **providers
+        )
+    )
+    second = run(
+        run_real_assessment_orchestration(
+            object(), state.interview_session_id, **providers
+        )
+    )
     assert first == second
     assert first.assessment_state == state
+
+
+def test_real_context_wires_configured_llm_providers_through_langgraph(monkeypatch) -> None:
+    state = make_state()
+    patch_state(monkeypatch, state)
+
+    async def no_submission(*_args):
+        raise service.SubmissionAttemptNotFoundError
+
+    class MockProvider:
+        def __init__(self) -> None:
+            self.requests: list[tuple[LLMMessage, ...]] = []
+
+        def complete(self, messages: tuple[LLMMessage, ...]) -> LLMResponse:
+            self.requests.append(messages)
+            system = messages[0].content
+            payload = json.loads(messages[1].content)
+            if "interview presentation assistant" in system:
+                content = {
+                    "selected_question_id": payload["allowed_question_id"],
+                    "reason": "The current question is ready.",
+                    "interviewer_message": "Please begin.",
+                    "next_step": {
+                        "action": "continue",
+                        "topic": None,
+                        "difficulty": None,
+                        "language": None,
+                    },
+                }
+            elif "edge-case candidate generator" in system:
+                content = {
+                    "question_id": payload["question_id"],
+                    "cases": [],
+                    "reason": "No candidates were generated in this test.",
+                }
+            else:
+                raise AssertionError("unexpected model agent request")
+            return LLMResponse(
+                content=json.dumps(content), model="mock-model", request_id="mock-request"
+            )
+
+    provider = MockProvider()
+    monkeypatch.setattr(service, "get_latest_submission", no_submission)
+    monkeypatch.setattr(service, "OpenAILLMProvider", lambda: provider)
+    before = state.model_dump()
+    result = run(
+        run_real_assessment_orchestration(object(), state.interview_session_id)
+    )
+
+    assert len(provider.requests) == 2
+    assert result.assessment_state.model_dump() == before
+    assert result.interviewer_decision.question_id == state.current_question_id
+    assert result.edge_case_generation.question_id == state.current_question_id
+    assert result.feedback_result.assessment.score is None
+
+
+def test_closed_assessment_does_not_require_or_create_an_llm_provider(monkeypatch) -> None:
+    state = make_state(InterviewStatus.COMPLETED)
+    patch_state(monkeypatch, state)
+
+    def unexpected_provider():
+        pytest.fail("closed assessments must not initialize the LLM provider")
+
+    monkeypatch.setattr(service, "OpenAILLMProvider", unexpected_provider)
+    result = run(
+        run_real_assessment_orchestration(object(), state.interview_session_id)
+    )
+
+    assert result.assessment_state == state
+    assert result.status == "assessment_closed"

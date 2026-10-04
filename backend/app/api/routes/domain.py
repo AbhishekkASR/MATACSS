@@ -177,7 +177,7 @@ async def get_interview_results_route(
 ) -> AssessmentResultsResponse:
     await _ensure_interview_access(session, current_user, interview_session_id)
     try:
-        interview, question_results = await get_assessment_results(
+        interview, question_results, agent_feedback = await get_assessment_results(
             session, interview_session_id
         )
     except InterviewSessionNotFoundError as exc:
@@ -204,6 +204,7 @@ async def get_interview_results_route(
         questions=[
             QuestionResultResponse(**item) for item in question_results
         ],
+        agent_feedback=agent_feedback or None,
     )
 
 
@@ -234,8 +235,12 @@ async def complete_interview_route(
     session: AsyncSession = Depends(get_db_session),
     current_user: User | None = Depends(get_current_active_user),
 ) -> InterviewResponse:
-    if settings.jwt_secret and current_user is not None and current_user.role not in {"admin", "interviewer"}:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+    if (
+        settings.jwt_secret
+        and current_user is not None
+        and current_user.role not in {"admin", "interviewer"}
+    ):
+        await _ensure_interview_access(session, current_user, interview_session_id)
     return await _close_interview(interview_session_id, InterviewStatus.COMPLETED, session)
 
 
@@ -307,7 +312,14 @@ async def list_submission_attempts_route(
     interview_session_id: UUID,
     question_id: UUID,
     session: AsyncSession = Depends(get_db_session),
+    current_user: User | None = Depends(get_current_active_user),
 ) -> list[SubmissionAttemptResponse]:
+    if current_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Authentication is not configured.",
+        )
+    await _ensure_interview_access(session, current_user, interview_session_id)
     attempts = await _submission_attempts(interview_session_id, question_id, session)
     return [_submission_attempt_response(attempt) for attempt in attempts]
 
@@ -320,7 +332,14 @@ async def latest_submission_route(
     interview_session_id: UUID,
     question_id: UUID,
     session: AsyncSession = Depends(get_db_session),
+    current_user: User | None = Depends(get_current_active_user),
 ) -> SubmissionAttemptResponse:
+    if current_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Authentication is not configured.",
+        )
+    await _ensure_interview_access(session, current_user, interview_session_id)
     try:
         submission = await get_latest_submission(
             session, interview_session_id, question_id
@@ -526,10 +545,10 @@ async def list_test_cases_route(
     session: AsyncSession = Depends(get_db_session),
     current_user: User | None = Depends(get_current_active_user),
 ) -> list[QuestionTestCaseResponse]:
-    if settings.jwt_secret and current_user is not None and current_user.role not in {"admin", "interviewer"}:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
     try:
         test_cases = await list_question_test_cases(session, question_id)
     except QuestionNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Question not found") from exc
+    if current_user is None or current_user.role not in {"admin", "interviewer"}:
+        test_cases = [test_case for test_case in test_cases if test_case.is_sample]
     return [_test_case_response(test_case) for test_case in test_cases]

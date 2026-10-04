@@ -22,13 +22,11 @@ uniqueness validation.
 ## Providers and boundaries
 
 `EdgeCaseGeneratorProvider` is a narrow runtime-checkable protocol. The
-deterministic development provider uses only public prompt wording and makes
-no API-key, network, Docker, database, or execution calls. It conservatively
-returns no cases when the public prompt does not reveal a safe input shape.
+deterministic development provider uses only public prompt wording. Configured
+OpenAI/Azure implementations may propose additional bounded cases, but no
+provider can execute code, access Docker or the database, or see hidden cases.
 
-Generated cases exist only in the LangGraph runtime result. They are not
-inserted into `QuestionTestCase`, used by scoring, or treated as official
-evaluation inputs. The future real-LLM integration point is the provider
-protocol. A later step may add explicit human/system verification and route
-verified cases through the existing authorized execution and evaluation
-boundaries; that flow is intentionally not implemented here.
+Generated cases are persisted only as advisory feedback. They are not inserted
+into `QuestionTestCase`, used by scoring, or treated as official evaluation
+inputs. Explicit verification and promotion of generated cases into the
+official evaluation set are not implemented.

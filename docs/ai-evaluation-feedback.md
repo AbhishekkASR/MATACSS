@@ -60,12 +60,13 @@ is rejected.
 
 ## Security boundaries
 
-The feedback layer has no persistence model, no agent credentials, no Docker
-access, no direct database access, and no scoring mutation path. It strictly
-consumes already-authoritative runtime snapshots and public agent outputs.
+The graph feedback layer has no persistence model, no Docker access, no direct
+database access, and no scoring mutation path. A separate application service
+persists its typed outputs per evaluated submission and exposes them as
+advisory-only report fields.
 
-## Future work
+## Current boundary
 
-Real LLM-backed feedback, autonomous explanation generation, and automatic
-generated-case verification remain future work. This step implements only the
-deterministic aggregation foundation and the safety boundaries around it.
+Configured OpenAI/Azure providers can supply advisory agent feedback. Automatic
+verification of generated cases remains future work; their proposed outputs
+are never inserted into official test cases or scoring.

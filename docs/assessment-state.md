@@ -1,9 +1,9 @@
 # Assessment State contract
 
-Step 25 adds `app.schemas.assessment_state.AssessmentState`: a typed, immutable,
-sanitized point-in-time view of one interview. It is the hand-off contract for
-future orchestration work; it does not implement LangGraph, agents, LLM calls,
-or any new API endpoint.
+`app.schemas.assessment_state.AssessmentState` is a typed, immutable, sanitized
+point-in-time view of one interview. It is the hand-off contract used by the
+LangGraph orchestration service; it is not a persistence model or a separate
+source of truth.
 
 `build_assessment_state(session, interview_session_id)` in
 `app.services.assessment_state_service` derives the snapshot from the existing

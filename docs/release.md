@@ -2,9 +2,11 @@
 
 ## Release scope
 
-This repository is a deterministic, security-conscious release candidate for the MATACSS assessment platform. It includes the core assessment workflow, worker execution, Docker sandbox controls, authentication, orchestration foundations, and production configuration/observability guardrails.
-
-This release intentionally does not include real LLM integration, autonomous generated-test execution, or persistence of AI outputs.
+This repository contains the MATACSS assessment workflow, worker execution,
+Docker sandbox controls, authentication, LangGraph orchestration, configured
+OpenAI/Azure provider support, Question Bank lifecycle, and deployment
+configuration/observability guardrails. LLM outputs are advisory and remain
+separate from official deterministic evaluation.
 
 ## Implemented vs planned
 
@@ -18,19 +20,22 @@ This release intentionally does not include real LLM integration, autonomous gen
 - Durable execution jobs and local worker processing
 - Docker sandbox isolation and bounded execution controls
 - Official evaluation and score calculation using deterministic test cases
-- Bounded agent foundations for interviewer, code reviewer, and edge-case generation
+- Configurable provider-backed interviewer, code reviewer, and edge-case agents
 - Multi-agent orchestration handoff validation and advisory feedback aggregation
+- Per-submission persistence and retrieval of advisory feedback and next-step recommendations
+- Active-only Question Engine assignment and candidate progression
+- Supported Python functional-question evaluation inside the Docker sandbox
+- Admin-authenticated LLM question generation/adaptation as unverified drafts
 - Production config validation, secret masking, and CORS protection
 - Request/job correlation logging and observability safeguards
 - Deployment and CI documentation for GitHub release use
 
 ### Planned / intentionally not included
 
-- Real LLM provider integration
 - Autonomous execution or verification of generated test cases
-- Agent-side persistence into official evaluation data
-- External production queueing beyond the deterministic local worker foundation
-- Frontend or API features that rely on untrusted autonomous actions
+- Verification and promotion of generated edge cases into official test cases
+- Real-provider smoke testing without deployment credentials
+- External production executor and TLS infrastructure provisioning
 
 ## Release checklist
 
@@ -43,12 +48,13 @@ This release intentionally does not include real LLM integration, autonomous gen
 - [x] AI/agent outputs remain advisory and cannot overwrite official evaluation results
 - [x] Key security findings have been documented and regression-tested
 - [x] Non-Docker backend validation is passing
-- [x] Frontend lint/build checks are documented as required validation steps
-- [x] Docker integration tests remain environment-dependent and are not treated as a silent pass in minimal environments
+- [x] Frontend lint/build checks pass in the current Node-enabled environment
+- [x] Docker integration tests were run with an isolated SQLite schema and local Docker daemon
 
 ## Known limitations
 
-- The repository is intentionally deterministic and does not add real model providers.
+- Real OpenAI/Azure calls require deployment credentials and were not smoke-tested in this environment.
+- Generated edge cases are advisory and unverified; they are not used for official scoring.
 - The Docker sandbox remains a host-level execution boundary and should be validated in a hardened deployment environment.
 - PostgreSQL and Docker integration tests require the appropriate runtime services.
 - The app still assumes secure secret management, a trusted deployment boundary, and production operational hardening outside the application code.
@@ -70,16 +76,16 @@ This release is not a claim of full immunity to host-level, kernel-level, or dep
 ### Run commands
 
 ```powershell
-cd C:\Users\Abhishek\Desktop\MATACSS.worktrees\edge-case-generator-agent-foundation
-python -m compileall backend/app
+cd C:\Users\Abhishek\Desktop\MATACSS
 cd backend
+python -m compileall app tests
 python -m pytest tests --ignore=tests/integration -q
 ```
 
 Frontend checks (when Node deps are installed):
 
 ```powershell
-cd frontend
+cd C:\Users\Abhishek\Desktop\MATACSS\frontend
 npm run lint
 npm run build
 ```
@@ -87,18 +93,19 @@ npm run build
 Docker validation (when Docker is available):
 
 ```powershell
-cd backend
+cd C:\Users\Abhishek\Desktop\MATACSS\backend
 python -m pytest tests/integration -q
 ```
 
 ### Current results
 
 - Backend compile check: passed
-- Full non-Docker backend suite: 157 passed, 0 failed
+- Full non-Docker backend suite: 315 passed, 0 failed
+- Docker sandbox/submission integration modules: 28 passed
 - Security-focused auth/config/logging checks: passed
-- Frontend lint/build: run in a Node-enabled environment as required, without modifying app behavior
-- Docker/PostgreSQL integration tests: environment-dependent and only valid when the required services are available locally
+- Frontend lint/build: passed
+- PostgreSQL runtime integration and production Compose startup: not verified in this environment
 
 ## Release recommendation
 
-This repository is suitable for public-facing documentation and release-oriented validation as a deterministic, security-conscious assessment platform foundation. It should be published with the explicit caveat that real LLM integration, autonomous generated-case verification, and external production infrastructure remain future work rather than current features.
+This repository is suitable for release-oriented validation as a security-conscious assessment platform. A real-provider smoke test, generated-case verification workflow, and provisioned production executor remain unverified or incomplete and should be treated as such.

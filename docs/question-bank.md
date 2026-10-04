@@ -7,7 +7,7 @@ flow into the Question Engine, candidate assessments, and Docker-backed
 deterministic evaluation.
 
 ```
-Question Bank (LiveCodeBench + future sources)
+Question Bank (LiveCodeBench + admin-generated drafts)
         ↓
   Normalizer / Importer
         ↓
@@ -32,7 +32,7 @@ pipeline already consumes unchanged.
 | Size | 128.1 MB |
 | Records | 175 |
 | AtCoder problems | 112 (stdin/stdout evaluation) |
-| LeetCode problems | 63 (functional evaluation — draft only) |
+| LeetCode problems | 63 (functional Python subset; validation-gated) |
 | Difficulty distribution | 43 Easy · 52 Medium · 80 Hard |
 | Total test cases | 7,000 (463 public + 6,537 private) |
 | SHA-256 | `BB4C364F71921C4495A6AD15ABE1A927350B720009F4933E2E71F8AF0F6FD1F5` |
@@ -66,8 +66,9 @@ draft  →  validated  →  approved  →  active  →  deprecated
 
 - **AtCoder (stdin)**: Questions with ≥1 private test case are automatically
   promoted from `draft` to `validated`.
-- **LeetCode (functional)**: Questions stay at `draft` until a functional
-  execution harness is implemented.
+- **LeetCode (functional)**: Supported Python method stubs and all test cases
+  are checked against the functional input/result contract before reaching
+  `validated`; validation does not approve or activate a question.
 
 ---
 
@@ -81,14 +82,18 @@ directly to the existing `QuestionTestCase.stdin` and
 `QuestionTestCase.expected_stdout` fields and run through the unmodified
 Docker sandbox and deterministic evaluator.
 
-### LeetCode — functional (future)
+### LeetCode — functional (supported Python subset)
 
-LeetCode problems use `testtype: "functional"`. The `input` field is a
-JSON-serialized argument list; the `output` field is a JSON-serialized return
-value. These **cannot** be run through the current stdin/stdout evaluation
-path. They are imported as `draft` with `is_functional = TRUE` on every test
-case. A Python harness (not yet implemented) will bridge the functional format
-to the Docker sandbox in a future additive capability.
+LeetCode problems use `testtype: "functional"`. The `input` field contains one
+literal argument per line and the `output` field is a JSON-serialized return
+value. The current harness supports one synchronous public instance method on
+a Python `Solution` class with positional arguments. Candidate code and method
+calls execute inside the existing Docker sandbox; return values are compared
+as JSON-like values. Async, static/class, variadic, keyword-only, and
+non-Python functional signatures remain unsupported and stay `draft`.
+
+Functional support does not bypass the question lifecycle: `validated`
+questions still require human/admin approval and activation before assignment.
 
 ---
 

@@ -113,7 +113,7 @@ class CodeReviewResult(BaseModel):
 
 @runtime_checkable
 class CodeReviewerProvider(Protocol):
-    """Provider boundary for a future real LLM-backed reviewer."""
+    """Provider boundary for deterministic or LLM-backed static review."""
 
     def review(self, review_input: CodeReviewInput) -> CodeReviewResult:
         """Review only the explicitly supplied source and public context."""

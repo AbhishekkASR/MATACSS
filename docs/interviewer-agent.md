@@ -1,29 +1,29 @@
-# Interviewer Agent foundation
+# Interviewer Agent
 
-Step 27 adds a bounded Interviewer Agent node to the existing LangGraph
-orchestration layer. Its sole responsibility is choosing presentation context
-for the current assigned question, or returning a safe non-question decision
-when an assessment is closed, empty, or fully attempted.
+The bounded Interviewer Agent runs in the existing LangGraph orchestration
+layer. It presents only the authoritative current assigned question, or returns
+a safe non-question decision when an assessment is closed, empty, or fully
+attempted. On a completed attempt it may also return a constrained advisory
+continue/finish recommendation with optional topic, difficulty, and language
+characteristics.
 
-The node accepts the Step 25 immutable `AssessmentState` and returns an
-immutable `InterviewerDecision`. The output can include only an assigned current
-question ID, sequence/index, title, public prompt, a concise reason, and an
-optional candidate-facing message. It excludes candidate PII, source code,
-submission output, test cases, expected outputs, credentials, and Docker data.
+The node accepts the immutable `AssessmentState` and returns an immutable
+`InterviewerDecision`. A presentation decision can include only the assigned
+current question ID, sequence/index, title, public prompt, a concise reason,
+and an optional candidate-facing message. It excludes candidate PII, source
+code, submission output, test cases, expected outputs, credentials, and Docker
+data.
 
-`InterviewerProvider` is a small injected protocol for future provider-backed
-selection. The current `DeterministicInterviewerProvider` uses only the supplied
-state and selects the state-defined current question. The agent validates every
-provider selection against assigned questions and rejects selections outside the
-assessment or away from the current question.
+`InterviewerProvider` is the injected provider boundary. The deterministic
+provider uses only the supplied state. When a current question exists, the
+agent validates every provider selection against assignments and rejects
+selections outside the assessment or away from the current question. When all
+assigned questions have been attempted, a provider may return only a
+continuation recommendation; it cannot select a future question ID. The
+Question Engine resolves that recommendation against active, non-repeated
+questions.
 
-The graph is now:
-
-```text
-START -> assessment_context -> interviewer -> END
-```
-
-There is no provider SDK, API key, network call, database write, Docker call,
-question generation, adaptive difficulty, code review, scoring, or autonomous
-workflow in this step. A future real LLM provider must implement the same narrow
-protocol and remain subject to the agent's output validation.
+The production orchestration service can use the configured OpenAI/Azure
+provider through this narrow protocol. Recommendations and presentation
+messages remain advisory; the agent has no persistence, execution, scoring, or
+question-activation authority.

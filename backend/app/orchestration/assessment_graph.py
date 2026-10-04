@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from typing import Any, TypedDict
+from uuid import UUID
 
 from langgraph.graph import END, START, StateGraph
 from pydantic import BaseModel, ConfigDict
@@ -64,6 +65,7 @@ class AssessmentGraphState(TypedDict):
     edge_case_generation: EdgeCaseGenerationResult | None
     orchestration_result: MultiAgentOrchestrationResult | None
     feedback_result: FeedbackAggregationResult | None
+    feedback_question_id: UUID | None
 
 
 class AssessmentGraphResult(MultiAgentOrchestrationResult):
@@ -120,21 +122,31 @@ def edge_case_generator_node(provider: EdgeCaseGeneratorProvider):
 
 
 def prepare_review_context(state: AssessmentGraphState) -> dict[str, CodeReviewInput | None]:
-    """Validate that review input is explicitly for the interviewer-selected question."""
+    """Validate review input against the selected assigned-question context."""
     decision = InterviewerDecision.model_validate(state.get("interviewer_decision"))
     review_input = validate_code_review_input(state.get("review_input"))
-    if review_input is None or decision.question_id is None:
+    question_id = state.get("feedback_question_id") or decision.question_id
+    if review_input is None or question_id is None:
         return {"prepared_review_input": None}
-    if review_input.question_id != decision.question_id:
+    if review_input.question_id != question_id:
         raise AssessmentGraphValidationError(
-            "review input question must match the interviewer-selected question"
+            "review input question must match the selected assessment context"
         )
-    if (
-        review_input.question_title != decision.question_title
-        or review_input.question_prompt != decision.question_prompt
+    assessment = validate_assessment_state(state["assessment_state"])
+    assigned_question = next(
+        (
+            question
+            for question in assessment.assigned_questions
+            if question.question_id == question_id
+        ),
+        None,
+    )
+    if assigned_question is None or (
+        review_input.question_title != assigned_question.title
+        or review_input.question_prompt != assigned_question.description
     ):
         raise AssessmentGraphValidationError(
-            "review input public context must match the interviewer-selected question"
+            "review input public context must match its assigned question"
         )
     return {"prepared_review_input": review_input}
 
@@ -155,33 +167,44 @@ def prepare_edge_case_context(
 ) -> dict[str, EdgeCaseGeneratorInput | None]:
     """Build edge-case context from the selected question and safe summaries only."""
     decision = InterviewerDecision.model_validate(state.get("interviewer_decision"))
-    if decision.question_id is None:
+    question_id = state.get("feedback_question_id") or decision.question_id
+    if question_id is None:
         return {"prepared_edge_case_input": None}
     supplied = state.get("edge_case_input")
     if supplied is not None:
         supplied = EdgeCaseGeneratorInput.model_validate(supplied)
+        assessment = validate_assessment_state(state["assessment_state"])
+        assigned_question = next(
+            (
+                question
+                for question in assessment.assigned_questions
+                if question.question_id == question_id
+            ),
+            None,
+        )
         if (
-            supplied.question_id != decision.question_id
-            or supplied.question_title != decision.question_title
-            or supplied.question_prompt != decision.question_prompt
+            assigned_question is None
+            or supplied.question_id != question_id
+            or supplied.question_title != assigned_question.title
+            or supplied.question_prompt != assigned_question.description
         ):
             raise AssessmentGraphValidationError(
-                "edge-case context must match the interviewer-selected question"
+                "edge-case context must match its assigned question"
             )
         return {"prepared_edge_case_input": supplied}
     assessment = validate_assessment_state(state["assessment_state"])
     selected = next(
         question for question in assessment.assigned_questions
-        if question.question_id == decision.question_id
+        if question.question_id == question_id
     )
     if selected.expected_language not in {"python", "cpp", "java"}:
         return {"prepared_edge_case_input": None}
     review = state.get("code_review")
     return {
         "prepared_edge_case_input": EdgeCaseGeneratorInput(
-            question_id=decision.question_id,
-            question_title=decision.question_title or selected.title,
-            question_prompt=decision.question_prompt or selected.description,
+            question_id=question_id,
+            question_title=selected.title,
+            question_prompt=selected.description,
             language=selected.expected_language,
             code_review_summary=(
                 review.correctness_summary
@@ -222,6 +245,7 @@ def feedback_aggregator_node(provider: FeedbackAggregatorProvider):
                 state.get("edge_case_generation")
             ),
             "orchestration_result": MultiAgentOrchestrationResult.model_validate(orchestration),
+            "focus_question_id": state.get("feedback_question_id"),
         }
         return {"feedback_result": aggregator.aggregate(aggregation_input)}
 
@@ -282,6 +306,7 @@ def invoke_assessment_graph(
     edge_case_generator_provider: EdgeCaseGeneratorProvider | None = None,
     edge_case_input: EdgeCaseGeneratorInput | object | None = None,
     feedback_aggregator_provider: FeedbackAggregatorProvider | None = None,
+    feedback_question_id: UUID | None = None,
 ) -> AssessmentGraphResult:
     """Run the coordinated graph from a validated snapshot without side effects."""
     try:
@@ -311,6 +336,7 @@ def invoke_assessment_graph(
                 "edge_case_generation": None,
                 "orchestration_result": None,
                 "feedback_result": None,
+                "feedback_question_id": feedback_question_id,
             }
         )
         if result.get("context_initialized") is not True:

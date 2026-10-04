@@ -56,7 +56,12 @@ def test_direct_openai_provider_uses_configured_model_and_timeout(monkeypatch: p
     provider = make_provider(monkeypatch, configured_settings(monkeypatch), completions)
     result = provider.complete([LLMMessage(role="user", content="hello")])
     assert result.content == "completion"
-    assert completions.request == {"model": "test-model", "messages": [{"role": "user", "content": "hello"}], "timeout": 7.5}
+    assert completions.request == {
+        "model": "test-model",
+        "messages": [{"role": "user", "content": "hello"}],
+        "response_format": {"type": "json_object"},
+        "timeout": 7.5,
+    }
 
 
 def test_direct_openai_client_has_no_retries(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -72,6 +77,12 @@ def test_azure_provider_overrides_model_endpoint_and_timeout(monkeypatch: pytest
     provider = make_provider(monkeypatch, settings, completions, constructor_args)
     assert provider.complete([LLMMessage(role="user", content="hello")]).model == "deployment-v2"
     assert constructor_args == {"api_key": "test-azure-secret", "base_url": "https://matacss-test.openai.azure.com/openai/v1/", "timeout": 11.5, "max_retries": 0}
+    assert completions.request == {
+        "model": "deployment-v2",
+        "messages": [{"role": "user", "content": "hello"}],
+        "response_format": {"type": "json_object"},
+        "timeout": 11.5,
+    }
 
 
 @pytest.mark.parametrize("missing", ["AZURE_OPENAI_ENDPOINT", "AZURE_OPENAI_API_KEY", "AZURE_OPENAI_DEPLOYMENT"])

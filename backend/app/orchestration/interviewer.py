@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Protocol, runtime_checkable
+from typing import Literal, Protocol, runtime_checkable
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
@@ -26,19 +26,40 @@ class InterviewerDecisionType(StrEnum):
     ASSESSMENT_CLOSED = "assessment_closed"
 
 
+class InterviewerNextStepAction(StrEnum):
+    CONTINUE = "continue"
+    FINISH = "finish"
+
+
+class InterviewerNextStepRecommendation(BaseModel):
+    """Advisory characteristics only; the Question Engine resolves any next question."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    action: InterviewerNextStepAction
+    topic: str | None = Field(default=None, max_length=100)
+    difficulty: Literal["easy", "medium", "hard"] | None = None
+    language: Literal["python", "cpp", "java"] | None = None
+
+
 class InterviewerProviderSelection(BaseModel):
     """Minimal provider output, validated against the authoritative snapshot."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
-    selected_question_id: UUID
+    selected_question_id: UUID | None = None
     reason: str = Field(min_length=1, max_length=500)
     interviewer_message: str | None = Field(default=None, max_length=1_000)
+    next_step: InterviewerNextStepRecommendation = Field(
+        default_factory=lambda: InterviewerNextStepRecommendation(
+            action=InterviewerNextStepAction.CONTINUE
+        )
+    )
 
 
 @runtime_checkable
 class InterviewerProvider(Protocol):
-    """Provider boundary for a future real LLM integration."""
+    """Provider boundary for deterministic or LLM-backed interviewer decisions."""
 
     def select_question(
         self, assessment_state: AssessmentState
@@ -54,11 +75,20 @@ class DeterministicInterviewerProvider:
     ) -> InterviewerProviderSelection:
         assessment = validate_assessment_state(assessment_state)
         if assessment.current_question_id is None:
-            raise InterviewerAgentError("active assessment has no current question")
+            return InterviewerProviderSelection(
+                reason="All assigned questions have at least one submission attempt.",
+                interviewer_message=None,
+                next_step=InterviewerNextStepRecommendation(
+                    action=InterviewerNextStepAction.FINISH
+                ),
+            )
         return InterviewerProviderSelection(
             selected_question_id=assessment.current_question_id,
             reason="The first unattempted assigned question is the current question.",
             interviewer_message="Please work through the current assigned question.",
+            next_step=InterviewerNextStepRecommendation(
+                action=InterviewerNextStepAction.CONTINUE
+            ),
         )
 
 
@@ -75,6 +105,11 @@ class InterviewerDecision(BaseModel):
     question_prompt: str | None = None
     reason: str = Field(min_length=1, max_length=500)
     interviewer_message: str | None = Field(default=None, max_length=1_000)
+    next_step: InterviewerNextStepRecommendation = Field(
+        default_factory=lambda: InterviewerNextStepRecommendation(
+            action=InterviewerNextStepAction.CONTINUE
+        )
+    )
 
     @model_validator(mode="after")
     def validate_question_context(self) -> "InterviewerDecision":
@@ -110,27 +145,42 @@ class InterviewerAgent:
                 decision_type=InterviewerDecisionType.ASSESSMENT_CLOSED,
                 reason=f"Assessment is {assessment.assessment_status} and cannot present a question.",
                 interviewer_message="This assessment is no longer active.",
+                next_step=InterviewerNextStepRecommendation(
+                    action=InterviewerNextStepAction.FINISH
+                ),
             )
         if not assessment.assigned_questions:
             return InterviewerDecision(
                 decision_type=InterviewerDecisionType.NO_ASSIGNED_QUESTIONS,
                 reason="The active assessment has no assigned questions.",
+                next_step=InterviewerNextStepRecommendation(
+                    action=InterviewerNextStepAction.FINISH
+                ),
             )
-        if assessment.current_question_id is None:
-            return InterviewerDecision(
-                decision_type=InterviewerDecisionType.ALL_QUESTIONS_ATTEMPTED,
-                reason="All assigned questions have at least one submission attempt.",
-            )
-
         try:
             provider_output = self._provider.select_question(assessment)
             selection = InterviewerProviderSelection.model_validate(provider_output)
         except (TypeError, ValidationError, ValueError) as exc:
             raise InterviewerAgentError("provider returned an invalid question selection") from exc
+        if assessment.current_question_id is None:
+            if selection.selected_question_id is not None:
+                raise InterviewerAgentError(
+                    "provider selected a question when no assigned question remains"
+                )
+            return InterviewerDecision(
+                decision_type=InterviewerDecisionType.ALL_QUESTIONS_ATTEMPTED,
+                reason=selection.reason,
+                interviewer_message=selection.interviewer_message,
+                next_step=selection.next_step,
+            )
         assigned_by_id = {
             question.question_id: (index, question)
             for index, question in enumerate(assessment.assigned_questions)
         }
+        if selection.selected_question_id is None:
+            raise InterviewerAgentError(
+                "provider did not select the current assigned question"
+            )
         selected = assigned_by_id.get(selection.selected_question_id)
         if selected is None:
             raise InterviewerAgentError("provider selected a question outside this assessment")
@@ -147,4 +197,5 @@ class InterviewerAgent:
             question_prompt=question.description,
             reason=selection.reason,
             interviewer_message=selection.interviewer_message,
+            next_step=selection.next_step,
         )

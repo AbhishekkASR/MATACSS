@@ -38,7 +38,6 @@ class UserCreateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     email: str
     password: str = Field(min_length=8, max_length=128)
-    role: UserRole = UserRole.CANDIDATE
 
     @field_validator("email")
     @classmethod

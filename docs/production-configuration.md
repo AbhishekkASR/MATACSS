@@ -29,6 +29,22 @@ safe while production deployments fail early on insecure or incomplete settings.
 - `MATACSS_WORKER_BATCH_SIZE`: job batching size.
 - `MATACSS_WORKER_MAX_RETRIES`: retry policy for worker tasks.
 - `MATACSS_SANDBOX_*`: sandbox runtime image and security-limits config.
+- `OPENAI_API_KEY`, `OPENAI_MODEL`, and `OPENAI_TIMEOUT_SECONDS`: optional
+  direct OpenAI provider configuration.
+- `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`,
+  `AZURE_OPENAI_DEPLOYMENT`, and `AZURE_OPENAI_TIMEOUT_SECONDS`: optional Azure
+  OpenAI provider configuration; supply the endpoint, key, and deployment
+  together.
+
+The Docker SDK is used by both the continuous execution worker and the API's
+submission-evaluation route. The Compose deployment therefore gives both
+backend services a read-only mount of the Docker TLS client certificate
+directory and sets `DOCKER_HOST`, `DOCKER_TLS_VERIFY`, and `DOCKER_CERT_PATH`.
+Point these only to a dedicated, network-restricted execution host. Docker
+Engine API client certificates grant broad daemon control; TLS does not reduce
+those permissions. Never mount the application host's Docker socket or share
+its daemon with this workload. See [deployment.md](deployment.md) for the call
+topology, Compose network boundaries, and startup procedure.
 
 ## Production behavior
 
@@ -58,9 +74,11 @@ security settings.
 
 ## Example file
 
-Use the checked-in template at `backend/.env.production.example` as a starting
-point for real deployments. It contains placeholders only; no real secrets should
-be committed.
+Use the checked-in template at
+[backend/production.env.example](../backend/production.env.example) as a
+starting point for real deployments. It contains placeholders only; do not
+commit populated env files, database passwords, JWT secrets, LLM keys, or Docker
+client private keys.
 
 ## Security notes
 

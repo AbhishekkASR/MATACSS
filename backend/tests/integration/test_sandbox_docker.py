@@ -50,6 +50,23 @@ def test_python_success(sandbox: DockerSandboxService) -> None:
     assert result.stdout.strip() == "hello"
 
 
+def test_python_functional_return_value(sandbox: DockerSandboxService) -> None:
+    source = (
+        "class Solution:\n"
+        "    def zigzagTraversal(self, grid: List[List[int]]) -> List[int]:\n"
+        "        print('candidate output is ignored')\n"
+        "        return [grid[0][0], grid[1][1]]\n"
+    )
+    result = sandbox.execute(
+        "python",
+        source,
+        stdin="[[1, 2], [3, 4]]",
+        functional_method="zigzagTraversal",
+    )
+    assert result.status == "success"
+    assert result.stdout == "[1,4]"
+
+
 def test_python_runtime_error(sandbox: DockerSandboxService) -> None:
     result = sandbox.execute("python", "raise RuntimeError('boom')")
     assert result.status == "runtime_error"

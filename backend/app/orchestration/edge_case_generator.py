@@ -122,7 +122,7 @@ class EdgeCaseGenerationResult(BaseModel):
 
 @runtime_checkable
 class EdgeCaseGeneratorProvider(Protocol):
-    """Provider boundary for a future real LLM integration."""
+    """Provider boundary for deterministic or LLM-backed candidate generation."""
 
     def generate(self, generation_input: EdgeCaseGeneratorInput) -> EdgeCaseGenerationResult:
         """Generate only bounded candidates from explicitly supplied public context."""

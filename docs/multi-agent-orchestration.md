@@ -1,8 +1,9 @@
 # Multi-Agent Orchestration foundation
 
-Step 30 coordinates the deterministic Interviewer, Code Reviewer, and
-Edge-Case Generator foundations without adding an LLM or a second assessment
-model.
+The existing LangGraph flow coordinates the Interviewer, Code Reviewer, and
+Edge-Case Generator using the immutable assessment snapshot and narrow provider
+contracts. Configured OpenAI/Azure providers supply advisory outputs; the
+deterministic providers remain injectable for tests and local use.
 
 ## Flow and handoffs
 
@@ -36,20 +37,19 @@ service, then obtains the selected question's latest submission and evaluation
 through the existing submission/results services. The graph receives those
 prepared values; agents never receive an `AsyncSession` or ORM object.
 
-Step 32 adds a bounded `feedback_aggregator` node after the orchestrator. It
-combines assessment, question, static-review, and edge-case outputs into one
-final typed feedback result while preserving deterministic evaluation as the
-only source of truth for correctness and score. The feedback layer is advisory
-only and never writes persistence or mutates evaluation data.
+The bounded `feedback_aggregator` node combines assessment, question,
+static-review, and edge-case outputs into one typed feedback result while
+preserving deterministic evaluation as the only source of truth for correctness
+and score. The feedback layer is advisory only and never mutates evaluation
+data. A separate application service persists results per submission.
 
 ## Security and persistence boundaries
 
 The coordinator validates every handoff and provider result. It does not
-execute candidate code, call Docker, access PostgreSQL, persist agent output,
-modify scores/evaluations, or expose hidden tests, hidden outputs,
-credentials, Docker internals, unrestricted database objects, or unnecessary
-candidate PII.
+execute candidate code, call Docker, access PostgreSQL, modify
+scores/evaluations, or expose hidden tests, hidden outputs, credentials, Docker
+internals, unrestricted database objects, or unnecessary candidate PII.
 
-All providers remain deterministic and dependency-injectable. Real LLM
-integration, autonomous behavior, AI-output persistence, and generated-case
-verification/execution remain future work.
+The Interviewer may return a bounded continuation recommendation. The Question
+Engine, not the model, resolves the next active, non-repeated question.
+Generated edge cases remain unverified and are not official evaluation inputs.

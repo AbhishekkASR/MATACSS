@@ -4,20 +4,134 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-matacss}
       POSTGRES_USER: ${POSTGRES_USER:-matacss_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in backend/.env or the shell}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in backend/.env}
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:${POSTGRES_PUBLISHED_PORT:-5432}:5432"
     volumes:
       - matacss_postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
       test:
         - CMD-SHELL
-        - pg_isready -U ${POSTGRES_USER:-matacss_user} -d ${POSTGRES_DB:-matacss}
+        - pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
       interval: 5s
       timeout: 5s
       retries: 10
       start_period: 5s
+    networks:
+      - database
+
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - ./.env
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    networks:
+      - database
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - ./.env
+    environment:
+      DOCKER_HOST: ${MATACSS_DOCKER_HOST:?Set MATACSS_DOCKER_HOST to the dedicated executor's TLS endpoint}
+      DOCKER_TLS_VERIFY: "1"
+      DOCKER_CERT_PATH: /run/docker-certs
+      MATACSS_API_HOST: 0.0.0.0
+      MATACSS_API_PORT: 8000
+    volumes:
+      - ${MATACSS_DOCKER_CERTS_DIR:?Set MATACSS_DOCKER_CERTS_DIR to the client certificate directory}:/run/docker-certs:ro
+    ports:
+      - "${MATACSS_API_BIND_ADDRESS:-127.0.0.1}:${MATACSS_API_PUBLISHED_PORT:-8000}:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - frontend
+      - database
+      - executor
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - ./.env
+    environment:
+      DOCKER_HOST: ${MATACSS_DOCKER_HOST:?Set MATACSS_DOCKER_HOST to the dedicated executor's TLS endpoint}
+      DOCKER_TLS_VERIFY: "1"
+      DOCKER_CERT_PATH: /run/docker-certs
+    volumes:
+      - ${MATACSS_DOCKER_CERTS_DIR:?Set MATACSS_DOCKER_CERTS_DIR to the client certificate directory}:/run/docker-certs:ro
+    command: ["python", "scripts/run_worker.py"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import sys; s=open('/proc/1/stat').read().split(); sys.exit(0 if len(s) > 2 and s[2] != 'Z' else 1)"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - database
+      - executor
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:?Set NEXT_PUBLIC_API_BASE_URL to the browser-accessible API URL}
+    ports:
+      - "${MATACSS_FRONTEND_BIND_ADDRESS:-127.0.0.1}:${MATACSS_FRONTEND_PUBLISHED_PORT:-3000}:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - frontend
 
 volumes:
   matacss_postgres_data:
+
+networks:
+  frontend:
+    internal: true
+  database:
+    internal: true
+  executor:

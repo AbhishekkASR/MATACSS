@@ -69,6 +69,50 @@ def test_python_success_uses_restricted_container_and_cleans_up() -> None:
     container.remove.assert_called_once_with(force=True)
 
 
+def test_python_functional_execution_uses_same_restricted_container() -> None:
+    service, client, container = make_service(
+        [SimpleNamespace(exit_code=0, output=(b"[1,4]", b""))]
+    )
+
+    result = service.execute(
+        "python",
+        (
+            "class Solution:\n"
+            "    def pick(self, values):\n"
+            "        print('ignored')\n"
+            "        return values\n"
+        ),
+        stdin="[1, 4]",
+        functional_method="pick",
+    )
+
+    assert result.status == "success"
+    assert result.stdout == "[1,4]"
+    assert client.api.exec_create.call_args.args[1] == (
+        "sh",
+        "-c",
+        "python /tmp/functional_runner.py < /tmp/stdin",
+    )
+    assert client.containers.create.call_args.kwargs["network_disabled"] is True
+    assert client.containers.create.call_args.kwargs["read_only"] is True
+    assert client.containers.create.call_args.kwargs["mem_limit"] == "64m"
+    assert client.containers.create.call_args.kwargs["nano_cpus"] == 250_000_000
+    assert client.containers.create.call_args.kwargs["pids_limit"] == 16
+    assert container.remove.call_args.kwargs == {"force": True}
+
+
+def test_functional_execution_rejects_non_python_without_starting_docker() -> None:
+    client = Mock()
+    service = DockerSandboxService(client=client)
+
+    result = service.execute(
+        "cpp", "int main() {}", functional_method="solve"
+    )
+
+    assert result.status == "runtime_error"
+    assert client.containers.create.called is False
+
+
 def test_java_uses_available_runtime_image() -> None:
     assert (
         DockerSandboxService._RUNTIMES["java"].image

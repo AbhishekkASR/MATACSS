@@ -29,7 +29,11 @@ def set_question_status(
         finally:
             await generator.aclose()
 
-    asyncio.run(update_status())
+    portal = client.portal
+    if portal is None:
+        asyncio.run(update_status())
+    else:
+        portal.call(update_status)
 
 
 async def _update_questions(session, question_ids: list[UUID], status: QuestionStatus) -> None:

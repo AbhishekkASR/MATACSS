@@ -4,7 +4,7 @@
 
 ### Multi-Agent Technical Assessment & Code Sandboxing System
 
-**An adaptive technical-assessment platform with a LangGraph multi-agent foundation, an LLM provider foundation, secure Docker execution, deterministic evaluation, and PostgreSQL-backed assessment state.**
+**An adaptive technical-assessment platform with LangGraph agents, OpenAI/Azure OpenAI provider support, secure Docker execution, deterministic evaluation, and PostgreSQL-backed assessment state.**
 
 [![Next.js](https://img.shields.io/badge/Next.js-000000?logo=next.js&logoColor=white)](https://nextjs.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
@@ -26,16 +26,16 @@ Instead of treating an assessment as a simple sequence of fixed coding questions
 
 | Layer | Responsibility |
 |---|---|
-| 🧠 **LLM Provider** | OpenAI and Azure OpenAI provider foundation; agent connections are the next implementation phase |
+| 🧠 **LLM Provider** | Backend-configured OpenAI and Azure OpenAI providers for bounded agent calls |
 | 🔀 **LangGraph** | Multi-agent orchestration, state flow, and validated handoffs |
-| 📚 **Question Engine** | Curated Question Bank with validated lifecycle; LLM generation/adaptation is a future source |
+| 📚 **Question Engine** | Curated Question Bank, lifecycle validation, and admin-authenticated draft generation/adaptation |
 | 🛡️ **Docker Sandbox** | Isolated execution of untrusted candidate code |
 | ✅ **Deterministic Evaluator** | Official correctness and scoring |
 | 🗄️ **PostgreSQL** | Durable assessment and execution state |
 | 🖥️ **Next.js + Monaco** | Candidate-facing assessment workspace |
 | ⚡ **FastAPI + Workers** | API layer and asynchronous execution lifecycle |
 
-> **Core principle:** The LLM provider foundation is not yet connected to the agents. Docker provides the execution boundary; deterministic tests remain the authority for correctness.
+> **Core principle:** LLM agent feedback and next-question recommendations are advisory. Docker provides the execution boundary; deterministic test results remain the authority for correctness and scoring.
 
 ---
 
@@ -146,23 +146,21 @@ flowchart TD
 
 ## 🧠 Multi-Agent System
 
-MATACSS has a LangGraph multi-agent architecture foundation with Interviewer, Code Reviewer, and Edge-Case agent roles. These agents are **not yet connected to the real LLM provider**; connecting them is the next implementation phase.
+MATACSS connects the Interviewer, Code Reviewer, and Edge-Case agent roles through LangGraph to the configured OpenAI or Azure OpenAI provider. Their bounded outputs are persisted as advisory assessment feedback; deterministic evaluation remains authoritative.
 
 ### 1. Interviewer Agent
 
-The Interviewer Agent is intended to drive assessment progression.
+The Interviewer Agent provides presentation guidance and a constrained continue/finish recommendation. The Question Engine selects any subsequent question from active, non-repeated questions; the agent cannot choose arbitrary question IDs.
 
 **Responsibilities**
 
-- Select the next question based on assessment context.
-- Use the question bank for reliable problem retrieval.
-- Generate or adapt a new problem when the assessment requires it.
-- Adjust topic and difficulty progression.
+- Present the current assigned question using assessment context.
+- Recommend optional topic, difficulty, and language characteristics for progression.
 - Maintain interview context through LangGraph state.
 
 ### 2. Code Reviewer Agent
 
-The Code Reviewer Agent is intended to analyze candidate submissions after execution.
+The Code Reviewer Agent provides bounded advisory static analysis after deterministic evaluation.
 
 **Responsibilities**
 
@@ -174,7 +172,7 @@ The Code Reviewer Agent is intended to analyze candidate submissions after execu
 
 ### 3. Edge-Case Agent
 
-The Edge-Case Agent is intended to search for weaknesses that may not be covered by the original visible examples.
+The Edge-Case Agent proposes unverified boundary-case ideas; it does not add cases to official evaluation or execute candidate code.
 
 **Responsibilities**
 
@@ -186,20 +184,20 @@ The Edge-Case Agent is intended to search for weaknesses that may not be covered
 
 ### 4. Feedback Aggregator
 
-The orchestration foundation includes feedback aggregation to combine agent outputs while keeping deterministic correctness separate from AI reasoning.
+LangGraph combines agent outputs and persists advisory feedback separately from deterministic correctness and scoring.
 
 ---
 
 ## 📚 Intelligent Question Engine
 
-MATACSS currently uses a curated Question Bank, with LiveCodeBench as its dataset source. LLM generation and adaptation are planned as an additional source; generated or imported questions must pass validation before they become usable.
+MATACSS uses a curated Question Bank, with LiveCodeBench as its current dataset source. Admin-authenticated LLM generation and adaptation can create draft questions and explicitly unverified draft artifacts. Imported and generated questions must pass validation and lifecycle review before they become assignable.
 
 ```text
                     Question Engine
                           │
              ┌────────────┴────────────┐
              ▼                         ▼
-       Question Bank                    LLM Generation (future)
+       Question Bank                    LLM Generation / Adaptation
              │                         │
              └────────────┬────────────┘
                           ▼
@@ -243,11 +241,11 @@ draft → validated → approved → active → deprecated
 
 ### LiveCodeBench dataset
 
-The current import contains **175 records**: **112 AtCoder** problems and **63 LeetCode** problems. AtCoder problems use stdin/stdout evaluation. LeetCode functional questions remain in draft because the functional execution harness is not yet implemented. The raw 128 MB+ JSONL dataset is not committed to Git and is SHA-256 verified before import.
+The current import contains **175 records**: **112 AtCoder** problems and **63 LeetCode** problems. AtCoder uses stdin/stdout evaluation. LeetCode functional evaluation is supported for the bounded Python instance-method format; records remain non-assignable until validated and approved through the lifecycle. The raw 128 MB+ JSONL dataset is not committed to Git and is SHA-256 verified before import.
 
 ### LLM provider foundation
 
-MATACSS has an LLM provider abstraction with direct OpenAI and Azure OpenAI configuration, deployment/model configuration, and timeout/error handling. Credentials remain backend-side. The provider is not yet connected to the Interviewer, Code Reviewer, or Edge-Case agents.
+MATACSS has an LLM provider abstraction with direct OpenAI and Azure OpenAI configuration, deployment/model configuration, and timeout/error handling. Credentials remain backend-side. Provider-backed agent responses are advisory; generated question artifacts and proposed edge cases require independent validation.
 
 ---
 
@@ -351,11 +349,11 @@ Structured relational data is used for authoritative state, while flexible metad
 
 ## 🔄 End-to-End Assessment Flow
 
-The following describes the intended end-to-end flow; connecting the agent roles to the real LLM provider and completing LLM question generation are still planned.
+The current end-to-end flow uses provider-backed agents for advisory feedback and bounded next-step recommendations.
 
 1. **Candidate starts an assessment.**
 2. **Interviewer Agent** reads the assessment context.
-3. **Question Engine** retrieves or generates a suitable problem.
+3. **Question Engine** retrieves an active question; admins may separately generate draft candidates.
 4. **Question Validation** checks the problem and executable test coverage.
 5. Candidate receives the problem in the **Monaco workspace**.
 6. Candidate submits code and optional standard input.
@@ -365,7 +363,7 @@ The following describes the intended end-to-end flow; connecting the agent roles
 10. **Deterministic Evaluation** calculates official correctness.
 11. **Code Reviewer Agent** analyzes the implementation.
 12. **Edge-Case Agent** proposes additional boundary cases.
-13. Verified execution data and AI feedback are combined into the assessment report.
+13. Deterministic results and separately persisted advisory AI feedback are combined in the assessment report.
 14. **Next.js** presents question results and technical feedback.
 
 ---
@@ -377,7 +375,7 @@ The following describes the intended end-to-end flow; connecting the agent roles
 | Frontend | Next.js, React, TypeScript, Monaco Editor |
 | Backend | FastAPI, Python, SQLAlchemy, Pydantic, Alembic |
 | Agent Orchestration | LangGraph |
-| AI Layer | OpenAI/Azure OpenAI provider foundation; agent connections are planned |
+| AI Layer | OpenAI/Azure OpenAI providers connected to bounded LangGraph agent roles |
 | Database | PostgreSQL |
 | Execution | Docker |
 | Async Processing | Durable job queue + execution worker |
@@ -395,16 +393,17 @@ The following describes the intended end-to-end flow; connecting the agent roles
 - Durable execution jobs and workers
 - Authentication and role-based access control (RBAC)
 - LangGraph orchestration foundation
+- Provider-backed Interviewer, Code Reviewer, and Edge-Case Agent outputs, persisted as advisory feedback
+- Adaptive Question Engine progression from validated recommendations and active questions
 - Question Bank with LiveCodeBench import and validation
-- LLM provider foundation for OpenAI and Azure OpenAI
+- OpenAI and Azure OpenAI provider support with backend-side credentials
+- Bounded Python functional evaluation through the Docker sandbox
 
 **Next implementation phase**
 
-- Connect the Interviewer Agent to the real LLM provider
-- Connect the Code Reviewer Agent to the real LLM provider
-- Connect the Edge-Case Agent to the real LLM provider
-- Complete LLM-driven question generation and adaptation
-- Complete remaining functional evaluation support where required
+- Run a real-provider smoke test when deployment credentials are provisioned
+- Extend functional evaluation to additional supported signatures/languages where required
+- Add explicit verification and approval workflows for generated artifacts before production use
 
 ---
 

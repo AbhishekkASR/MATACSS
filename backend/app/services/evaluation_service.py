@@ -10,8 +10,15 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.evaluation import EvaluationResult
+from app.models.question import Question
 from app.models.question_test_case import QuestionTestCase
 from app.models.submission import Submission
+from app.question_bank.functional import (
+    FunctionalFormatError,
+    functional_results_equal,
+    parse_expected_result,
+    solution_method,
+)
 from app.schemas.execution import ExecutionResult
 from app.services.database_service import (
     DatabasePersistenceError,
@@ -83,19 +90,54 @@ async def evaluate_submission(
         await session.refresh(result)
         return result
 
+    question = await session.get(Question, submission.question_id)
+    functional_method = None
+    if any(test_case.is_functional for test_case in test_cases) and question is not None:
+        try:
+            functional_method = solution_method(question.starter_code).name
+        except FunctionalFormatError:
+            pass
+
     details: list[dict[str, Any]] = []
     passed_count = 0
     for index, test_case in enumerate(test_cases):
-        execution = await asyncio.to_thread(
-            sandbox_service.execute,
-            language=submission.language,
-            source_code=submission.source_code,
-            stdin=test_case.stdin,
-        )
+        if test_case.is_functional and (
+            submission.language != "python" or functional_method is None
+        ):
+            execution = ExecutionResult(
+                status="runtime_error",
+                stderr="Unsupported functional execution format.",
+                exit_code=1,
+                execution_time_ms=0,
+            )
+        else:
+            execution = await asyncio.to_thread(
+                sandbox_service.execute,
+                language=submission.language,
+                source_code=submission.source_code,
+                stdin=test_case.stdin,
+                **(
+                    {"functional_method": functional_method}
+                    if test_case.is_functional
+                    else {}
+                ),
+            )
+
+        if test_case.is_functional:
+            try:
+                actual = parse_expected_result(execution.stdout)
+                expected = parse_expected_result(test_case.expected_stdout)
+                output_matches = functional_results_equal(actual, expected)
+            except FunctionalFormatError:
+                output_matches = False
+        else:
+            output_matches = (
+                normalize_output(execution.stdout)
+                == normalize_output(test_case.expected_stdout)
+            )
         passed = (
             execution.status == "success"
-            and normalize_output(execution.stdout)
-            == normalize_output(test_case.expected_stdout)
+            and output_matches
             and (
                 test_case.time_limit_ms is None
                 or execution.execution_time_ms <= test_case.time_limit_ms

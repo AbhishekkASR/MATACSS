@@ -76,7 +76,15 @@ class OpenAILLMProvider:
         if not messages or any(not message.content.strip() for message in messages):
             raise LLMProviderError(LLMFailureKind.INVALID_REQUEST, "At least one non-empty LLM message is required.")
         try:
-            response = self._client.chat.completions.create(model=self._model, messages=[{"role": message.role, "content": message.content} for message in messages], timeout=self._timeout_seconds)
+            response = self._client.chat.completions.create(
+                model=self._model,
+                messages=[
+                    {"role": message.role, "content": message.content}
+                    for message in messages
+                ],
+                response_format={"type": "json_object"},
+                timeout=self._timeout_seconds,
+            )
         except APITimeoutError:
             raise LLMProviderError(LLMFailureKind.TIMEOUT, "The LLM request timed out.") from None
         except APIConnectionError:

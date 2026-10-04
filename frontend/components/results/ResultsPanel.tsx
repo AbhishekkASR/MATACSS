@@ -1,4 +1,5 @@
 import type { AssessmentResults, QuestionResult } from "@/types";
+import { AgentFeedbackPanel } from "@/components/results/AgentFeedbackPanel";
 
 interface ResultsPanelProps {
   results: AssessmentResults | null;
@@ -51,6 +52,10 @@ export function ResultsPanel({ results, isLoading, error }: ResultsPanelProps) {
           </div>
         ))}
       </div>
+      <AgentFeedbackPanel
+        entries={results.agent_feedback ?? []}
+        questions={results.questions}
+      />
     </section>
   );
 }

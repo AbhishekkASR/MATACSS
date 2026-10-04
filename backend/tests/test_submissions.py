@@ -241,61 +241,34 @@ def test_unassigned_question_returns_409_without_execution(
     sandbox_service.execute.assert_not_called()
 
 
-def test_submission_history_is_newest_first_and_latest_is_returned(
-    client: TestClient, sandbox_service: Mock, database
-) -> None:
+def test_submission_history_requires_authentication(client: TestClient) -> None:
     interview, question = context(client)
-    sandbox_service.execute.side_effect = [
-        ExecutionResult(
-            status="runtime_error",
-            stdout="first",
-            stderr="error",
-            exit_code=1,
-            execution_time_ms=2,
-        ),
-        ExecutionResult(
-            status="success",
-            stdout="second",
-            exit_code=0,
-            execution_time_ms=1,
-        ),
-    ]
-    payload = {
-        "interview_session_id": interview["interview_session_id"],
-        "question_id": question["question_id"],
-        "language": "python",
-        "source_code": "print(1)",
-    }
-    first = client.post("/api/v1/submissions", json=payload)
-    second = client.post("/api/v1/submissions", json=payload)
-    assert first.status_code == second.status_code == 200
-    process_job(database, sandbox_service)
-    process_job(database, sandbox_service)
-
-    history = client.get(
+    history_url = (
         f"/api/v1/interviews/{interview['interview_session_id']}/questions/"
         f"{question['question_id']}/submissions"
     )
-    latest = client.get(
+    latest_url = (
         f"/api/v1/interviews/{interview['interview_session_id']}/questions/"
         f"{question['question_id']}/latest-submission"
     )
-    assert history.status_code == 200
-    assert [attempt["stdout"] for attempt in history.json()] == ["second", "first"]
-    assert latest.status_code == 200
-    assert latest.json()["stdout"] == "second"
+    assert client.get(history_url).status_code == 503
+    assert client.get(latest_url).status_code == 503
 
 
-def test_latest_submission_without_attempt_returns_404(client: TestClient) -> None:
+def test_latest_submission_without_attempt_requires_authentication(
+    client: TestClient,
+) -> None:
     interview, question = context(client)
     response = client.get(
         f"/api/v1/interviews/{interview['interview_session_id']}/questions/"
         f"{question['question_id']}/latest-submission"
     )
-    assert response.status_code == 404
+    assert response.status_code == 503
 
 
-def test_submission_history_rejects_unassigned_question(client: TestClient) -> None:
+def test_submission_history_requires_authentication_before_question_lookup(
+    client: TestClient,
+) -> None:
     interview, _ = context(client)
     question = client.post(
         "/api/v1/questions",
@@ -310,11 +283,11 @@ def test_submission_history_rejects_unassigned_question(client: TestClient) -> N
         f"/api/v1/interviews/{interview['interview_session_id']}/questions/"
         f"{question['question_id']}/submissions"
     )
-    assert response.status_code == 409
+    assert response.status_code == 503
 
 
 @pytest.mark.parametrize("transition", ["complete", "cancel"])
-def test_submission_history_allows_closed_interviews(
+def test_closed_interview_history_requires_authentication(
     client: TestClient, sandbox_service: Mock, transition: str, database
 ) -> None:
     interview, question = context(client)
@@ -333,8 +306,7 @@ def test_submission_history_allows_closed_interviews(
         f"/api/v1/interviews/{interview['interview_session_id']}/questions/"
         f"{question['question_id']}/submissions"
     )
-    assert response.status_code == 200
-    assert len(response.json()) == 1
+    assert response.status_code == 503
 
 
 def test_inactive_interview_returns_409(

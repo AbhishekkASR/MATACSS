@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import re
 import time
 from dataclasses import dataclass
 import logging
@@ -16,6 +18,43 @@ from app.core.config import settings
 from app.schemas.execution import ExecutionResult
 
 logger = logging.getLogger(__name__)
+
+_FUNCTIONAL_RUNNER = """\
+import ast
+import contextlib
+import io
+import json
+import runpy
+import sys
+import typing
+
+method_name = {method_name_json}
+
+def parse_argument(value):
+    try:
+        return json.loads(value)
+    except json.JSONDecodeError:
+        return ast.literal_eval(value)
+
+raw_input = sys.stdin.read()
+arguments = [parse_argument(line) for line in raw_input.splitlines()]
+typing_names = {
+    name: getattr(typing, name)
+    for name in ("Any", "Dict", "List", "Optional", "Set", "Tuple")
+}
+with contextlib.redirect_stdout(io.StringIO()):
+    namespace = runpy.run_path(
+        "/tmp/main.py",
+        init_globals=typing_names,
+        run_name="__matacss_candidate__",
+    )
+    solution_class = namespace.get("Solution")
+    if not isinstance(solution_class, type):
+        raise TypeError("Solution class was not found")
+    method = getattr(solution_class(), method_name)
+    result = method(*arguments)
+sys.stdout.write(json.dumps(result, allow_nan=False, separators=(",", ":")))
+"""
 
 
 @dataclass(frozen=True)
@@ -82,11 +121,23 @@ class DockerSandboxService:
         language: str,
         source_code: str,
         stdin: str = "",
+        functional_method: str | None = None,
     ) -> ExecutionResult:
         """Execute source code and return a sanitized, bounded result."""
         runtime = self._RUNTIMES.get(language)
         if runtime is None:
             return self._sandbox_error()
+        if functional_method is not None and (
+            language != "python" or re.fullmatch(r"[A-Za-z_]\w*", functional_method) is None
+        ):
+            return self._result(
+                "runtime_error",
+                "",
+                "Unsupported functional execution format.",
+                1,
+                False,
+                time.perf_counter(),
+            )
 
         container = None
         started_at = time.perf_counter()
@@ -112,6 +163,16 @@ class DockerSandboxService:
             container.start()
             self._write_source(container, runtime.source_path, source_code)
             self._write_source(container, "/tmp/stdin", stdin)
+            run_command = runtime.run_command
+            if functional_method is not None:
+                self._write_source(
+                    container,
+                    "/tmp/functional_runner.py",
+                    _FUNCTIONAL_RUNNER.replace(
+                        "{method_name_json}", json.dumps(functional_method)
+                    ),
+                )
+                run_command = ("python", "/tmp/functional_runner.py")
 
             if runtime.compile_command is not None:
                 compilation = self._run_command(
@@ -129,7 +190,7 @@ class DockerSandboxService:
                         started_at,
                     )
 
-            execution = self._run_command(container, runtime.run_command)
+            execution = self._run_command(container, run_command)
             if execution.status != "success":
                 return self._with_duration(execution, started_at)
             status = "success" if execution.exit_code == 0 else "runtime_error"

@@ -35,7 +35,9 @@ async def build_assessment_state(
     latest-attempt/evaluation semantics. Extra identifier/timestamp lookups only
     enrich that derived data without exposing submission or test-case contents.
     """
-    interview, result_rows = await get_assessment_results(session, interview_session_id)
+    interview, result_rows, _agent_feedback = await get_assessment_results(
+        session, interview_session_id
+    )
     assignments = await list_assigned_questions(session, interview_session_id)
     result_by_question = {row["question_id"]: row for row in result_rows}
 

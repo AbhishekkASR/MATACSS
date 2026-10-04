@@ -1,7 +1,8 @@
 # Agent assessment integration
 
-Step 31 connects the deterministic multi-agent graph to a real MATACSS
-assessment without changing the public API or persistence model.
+The assessment orchestration service connects the multi-agent graph to persisted
+MATACSS assessments. The graph uses configured OpenAI/Azure providers and
+retained the existing deterministic evaluation as the official score source.
 
 ## Application boundary
 
@@ -32,8 +33,10 @@ not passed to agents.
 
 No agent receives a database session and no agent can write persistence,
 execute code, call Docker, mutate evaluation/scoring, or persist generated
-outputs. Existing submission execution and evaluation services remain the
-only authorized mechanisms for those operations.
+outputs. A separate feedback service persists validated agent results per
+submission, including provider failure state, without changing official
+evaluation data. Existing submission execution and evaluation services remain
+the only authorized mechanisms for execution and scoring.
 
 ## Graph integration
 
@@ -49,6 +52,7 @@ START
   -> END
 ```
 
-The graph remains deterministic. Real LLM providers, authentication, new API
-endpoints, AI-output persistence, autonomous execution, and generated-case
-verification are intentionally deferred.
+The orchestration remains bounded by typed contracts. Candidate-authenticated
+assessment routes call the existing Question Engine to resolve persisted
+continue/finish recommendations. Generated edge cases remain unverified and
+are not added to official test cases or evaluation.

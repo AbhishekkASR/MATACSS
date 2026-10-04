@@ -4,7 +4,7 @@
 
 This audit covered the application security boundaries in the current MATACSS codebase: authentication/JWT handling, authorization, environment configuration, Docker and worker execution boundaries, subprocess risk, logging and secret handling, CORS, agent data isolation, SQL/ORM usage, and CI/deployment secret hygiene.
 
-The project intentionally keeps deterministic orchestration and evaluation logic separate from execution, database writes, and Docker runtime behavior. AI/agent outputs remain advisory-only and are not allowed to execute code, access Docker, or mutate official evaluation data.
+The project intentionally keeps deterministic evaluation logic separate from execution and Docker runtime behavior. AI/agent outputs remain advisory-only and are not allowed to execute code, access Docker, or mutate official evaluation data; validated reports are persisted separately from evaluation records.
 
 ## Findings and fixes
 
@@ -53,7 +53,7 @@ The audit did not identify additional code-level issues in the current applicati
 - Assessment state remains authoritative and immutable.
 - Docker execution remains the only execution mechanism for candidate code.
 - Official evaluation/scoring remains authoritative for runtime correctness.
-- Agent outputs remain advisory and non-persistent.
+- Agent outputs remain advisory and are persisted separately from official evaluation records.
 - Database access is not granted to agents or orchestration nodes beyond existing application services.
 - No direct PostgreSQL access is exposed to the AI/agent path.
 - Secrets and credentials remain outside source control and are validated through env-based configuration.
@@ -74,10 +74,10 @@ These are deployment and infrastructure concerns rather than repository logic fl
 
 ### Security-focused tests
 
-Command:
+Command (from the repository root):
 
 ```powershell
-cd C:\Users\Abhishek\Desktop\MATACSS.worktrees\edge-case-generator-agent-foundation\backend
+cd backend
 python -m pytest tests/test_auth.py tests/test_production_config.py tests/test_observability.py -q
 ```
 
@@ -88,15 +88,15 @@ Result:
 
 ### Full non-Docker backend suite
 
-Command:
+Command (from the repository root):
 
 ```powershell
-cd C:\Users\Abhishek\Desktop\MATACSS.worktrees\edge-case-generator-agent-foundation\backend
+cd backend
 python -m pytest tests --ignore=tests/integration -q
 ```
 
 Result:
-- 157 passed
+- 315 passed
 - 0 failed
 
 ### Compile validation
@@ -104,8 +104,8 @@ Result:
 Command:
 
 ```powershell
-cd C:\Users\Abhishek\Desktop\MATACSS.worktrees\edge-case-generator-agent-foundation
-python -m compileall backend/app
+cd backend
+python -m compileall app tests
 ```
 
 Result:
@@ -113,16 +113,16 @@ Result:
 
 ### Docker/PostgreSQL integration status
 
-Command attempted:
+Historical command attempted:
 
 ```powershell
-cd C:\Users\Abhishek\Desktop\MATACSS.worktrees\edge-case-generator-agent-foundation\backend
+cd backend
 python -m pytest tests/integration -q
 ```
 
-Result:
-- Environment-dependent integration tests were attempted, but the runtime here does not provide the required Docker/PostgreSQL setup for a clean end-to-end verification.
-- The failure mode is environment-related and not a repository logic regression in the non-Docker security audit.
+Current validation:
+- Docker sandbox/submission integration modules: 28 passed with an isolated SQLite schema and local Docker daemon.
+- PostgreSQL runtime integration and the full production Compose stack remain unverified.
 
 ## Conclusion
 

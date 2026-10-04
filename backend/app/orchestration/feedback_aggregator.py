@@ -124,6 +124,7 @@ class FeedbackAggregationInput(BaseModel):
     code_review: CodeReviewResult | None = None
     edge_case_generation: EdgeCaseGenerationResult | None = None
     orchestration_result: MultiAgentOrchestrationResult | None = None
+    focus_question_id: UUID | None = None
 
 
 @runtime_checkable
@@ -148,7 +149,18 @@ class DeterministicFeedbackAggregator:
         orchestration = validated.orchestration_result
 
         question = None
-        if decision is not None and decision.question_id is not None:
+        if validated.focus_question_id is not None:
+            question = next(
+                (
+                    assigned
+                    for assigned in assessment.assigned_questions
+                    if assigned.question_id == validated.focus_question_id
+                ),
+                None,
+            )
+            if question is None:
+                raise ValueError("feedback focus question is not assigned to this assessment")
+        elif decision is not None and decision.question_id is not None:
             question = next(
                 (
                     assigned
@@ -225,7 +237,26 @@ class DeterministicFeedbackAggregator:
                 "No execution result has been recorded for this question yet.",
             )
 
-        if decision is not None and decision.question_id is not None:
+        if question is not None and validated.focus_question_id is not None:
+            guidance = [
+                "Official deterministic evaluation is authoritative; AI guidance is advisory only."
+            ]
+            if review is not None and review.improvement_suggestions:
+                guidance.append(review.improvement_suggestions[0])
+            if edge_cases is not None and edge_cases.cases:
+                guidance.append(
+                    f"{len(edge_cases.cases)} generated edge cases were proposed and remain unverified by default."
+                )
+            question_feedback = QuestionFeedback(
+                question_id=question.question_id,
+                question_title=question.title,
+                status=FeedbackStatus.GENERATED,
+                summary=(
+                    f"Advisory feedback for '{question.title}' is separate from the official evaluation."
+                ),
+                guidance=tuple(guidance[:10]),
+            )
+        elif decision is not None and decision.question_id is not None:
             question_feedback_status = FeedbackStatus.GENERATED
             question_summary = (
                 f"Question feedback for '{decision.question_title or 'selected question'}' is advisory and safe."
