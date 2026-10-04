@@ -133,5 +133,5 @@ networks:
   frontend:
     internal: true
   database:
-    internal: true
+    internal: false
   executor:
