@@ -4,11 +4,11 @@
 
 ### Multi-Agent Technical Assessment & Code Sandboxing System
 
-**An adaptive technical-assessment platform combining LLM reasoning, LangGraph multi-agent orchestration, secure Docker execution, deterministic evaluation, and PostgreSQL-backed assessment state.**
+**An adaptive technical-assessment platform with a LangGraph multi-agent foundation, an LLM provider foundation, secure Docker execution, deterministic evaluation, and PostgreSQL-backed assessment state.**
 
 [![Next.js](https://img.shields.io/badge/Next.js-000000?logo=next.js&logoColor=white)](https://nextjs.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![LangGraph](https://img.shields.io/badge/LangGraph-Multi--Agent-1f6feb)](https://langchain-ai.github.io/langgraph/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Docker](https://img.shields.io/badge/Docker-Sandbox-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
@@ -26,16 +26,16 @@ Instead of treating an assessment as a simple sequence of fixed coding questions
 
 | Layer | Responsibility |
 |---|---|
-| 🧠 **LLM Agents** | Reasoning, question selection/generation, code review, and edge-case reasoning |
+| 🧠 **LLM Provider** | OpenAI and Azure OpenAI provider foundation; agent connections are the next implementation phase |
 | 🔀 **LangGraph** | Multi-agent orchestration, state flow, and validated handoffs |
-| 📚 **Question Engine** | Question-bank retrieval plus LLM-assisted generation/adaptation |
+| 📚 **Question Engine** | Curated Question Bank with validated lifecycle; LLM generation/adaptation is a future source |
 | 🛡️ **Docker Sandbox** | Isolated execution of untrusted candidate code |
 | ✅ **Deterministic Evaluator** | Official correctness and scoring |
 | 🗄️ **PostgreSQL** | Durable assessment and execution state |
 | 🖥️ **Next.js + Monaco** | Candidate-facing assessment workspace |
 | ⚡ **FastAPI + Workers** | API layer and asynchronous execution lifecycle |
 
-> **Core principle:** LLMs provide reasoning and personalization; Docker provides the execution boundary; deterministic tests remain the authority for correctness.
+> **Core principle:** The LLM provider foundation is not yet connected to the agents. Docker provides the execution boundary; deterministic tests remain the authority for correctness.
 
 ---
 
@@ -146,9 +146,11 @@ flowchart TD
 
 ## 🧠 Multi-Agent System
 
+MATACSS has a LangGraph multi-agent architecture foundation with Interviewer, Code Reviewer, and Edge-Case agent roles. These agents are **not yet connected to the real LLM provider**; connecting them is the next implementation phase.
+
 ### 1. Interviewer Agent
 
-The Interviewer Agent drives the assessment progression.
+The Interviewer Agent is intended to drive assessment progression.
 
 **Responsibilities**
 
@@ -160,7 +162,7 @@ The Interviewer Agent drives the assessment progression.
 
 ### 2. Code Reviewer Agent
 
-The Code Reviewer Agent analyzes candidate submissions after execution.
+The Code Reviewer Agent is intended to analyze candidate submissions after execution.
 
 **Responsibilities**
 
@@ -172,7 +174,7 @@ The Code Reviewer Agent analyzes candidate submissions after execution.
 
 ### 3. Edge-Case Agent
 
-The Edge-Case Agent searches for weaknesses that may not be covered by the original visible examples.
+The Edge-Case Agent is intended to search for weaknesses that may not be covered by the original visible examples.
 
 **Responsibilities**
 
@@ -184,20 +186,20 @@ The Edge-Case Agent searches for weaknesses that may not be covered by the origi
 
 ### 4. Feedback Aggregator
 
-Combines agent outputs into a consistent assessment-level feedback model while keeping deterministic correctness separate from AI reasoning.
+The orchestration foundation includes feedback aggregation to combine agent outputs while keeping deterministic correctness separate from AI reasoning.
 
 ---
 
 ## 📚 Intelligent Question Engine
 
-MATACSS uses a two-source question strategy:
+MATACSS currently uses a curated Question Bank, with LiveCodeBench as its dataset source. LLM generation and adaptation are planned as an additional source; generated or imported questions must pass validation before they become usable.
 
 ```text
                     Question Engine
                           │
              ┌────────────┴────────────┐
              ▼                         ▼
-       Question Bank             LLM Generation
+       Question Bank                    LLM Generation (future)
              │                         │
              └────────────┬────────────┘
                           ▼
@@ -227,7 +229,25 @@ metadata
 source
 ```
 
-This lets MATACSS combine **reliable reusable assessment content** with **LLM-driven personalization and generation**.
+The Question Bank stores question provenance and lifecycle status. Questions follow this lifecycle:
+
+```text
+draft → validated → approved → active → deprecated
+```
+
+- **draft** — not assignable
+- **validated** — automated validation passed
+- **approved** — human/admin approval
+- **active** — assignable; only active questions can be assigned
+- **deprecated** — retired
+
+### LiveCodeBench dataset
+
+The current import contains **175 records**: **112 AtCoder** problems and **63 LeetCode** problems. AtCoder problems use stdin/stdout evaluation. LeetCode functional questions remain in draft because the functional execution harness is not yet implemented. The raw 128 MB+ JSONL dataset is not committed to Git and is SHA-256 verified before import.
+
+### LLM provider foundation
+
+MATACSS has an LLM provider abstraction with direct OpenAI and Azure OpenAI configuration, deployment/model configuration, and timeout/error handling. Credentials remain backend-side. The provider is not yet connected to the Interviewer, Code Reviewer, or Edge-Case agents.
 
 ---
 
@@ -331,6 +351,8 @@ Structured relational data is used for authoritative state, while flexible metad
 
 ## 🔄 End-to-End Assessment Flow
 
+The following describes the intended end-to-end flow; connecting the agent roles to the real LLM provider and completing LLM question generation are still planned.
+
 1. **Candidate starts an assessment.**
 2. **Interviewer Agent** reads the assessment context.
 3. **Question Engine** retrieves or generates a suitable problem.
@@ -355,11 +377,34 @@ Structured relational data is used for authoritative state, while flexible metad
 | Frontend | Next.js, React, TypeScript, Monaco Editor |
 | Backend | FastAPI, Python, SQLAlchemy, Pydantic, Alembic |
 | Agent Orchestration | LangGraph |
-| AI Layer | LLM-powered Interviewer, Reviewer, and Edge-Case agents |
+| AI Layer | OpenAI/Azure OpenAI provider foundation; agent connections are planned |
 | Database | PostgreSQL |
 | Execution | Docker |
 | Async Processing | Durable job queue + execution worker |
 | Evaluation | Deterministic test-case execution |
+
+---
+
+## 🚧 Implementation Status
+
+**Implemented**
+
+- FastAPI backend and Next.js/Monaco frontend
+- PostgreSQL persistence
+- Docker sandbox and deterministic evaluation
+- Durable execution jobs and workers
+- Authentication and role-based access control (RBAC)
+- LangGraph orchestration foundation
+- Question Bank with LiveCodeBench import and validation
+- LLM provider foundation for OpenAI and Azure OpenAI
+
+**Next implementation phase**
+
+- Connect the Interviewer Agent to the real LLM provider
+- Connect the Code Reviewer Agent to the real LLM provider
+- Connect the Edge-Case Agent to the real LLM provider
+- Complete LLM-driven question generation and adaptation
+- Complete remaining functional evaluation support where required
 
 ---
 
@@ -371,8 +416,10 @@ MATACSS/
 ├── backend/
 │   ├── app/
 │   │   ├── api/
+│   │   ├── core/
 │   │   ├── models/
 │   │   ├── orchestration/
+│   │   ├── question_bank/
 │   │   ├── schemas/
 │   │   └── services/
 │   │
@@ -389,6 +436,18 @@ MATACSS/
 ├── docs/
 └── README.md
 ```
+
+---
+
+## 🧪 Testing and CI
+
+From the `backend/` directory, run the backend tests with:
+
+```bash
+python -m pytest tests --ignore=tests/integration -q
+```
+
+The project uses automated backend and frontend CI validation. This describes the validation setup and does not indicate the status of any particular CI run.
 
 ---
 
