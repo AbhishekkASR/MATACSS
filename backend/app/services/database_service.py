@@ -11,7 +11,7 @@ from sqlalchemy import func, select
 from app.models.candidate import Candidate
 from app.models.interview import InterviewSession, InterviewStatus
 from app.models.interview_question import InterviewQuestion
-from app.models.question import Question
+from app.models.question import Question, QuestionStatus
 from app.models.submission import Submission
 from app.models.question_test_case import QuestionTestCase
 from app.models.evaluation import EvaluationResult
@@ -35,6 +35,10 @@ class InterviewSessionNotFoundError(Exception):
 
 class QuestionNotFoundError(Exception):
     """Raised when a submission references an unknown question."""
+
+
+class QuestionNotActiveError(Exception):
+    """Raised when assigning a question outside the active lifecycle state."""
 
 
 class InactiveInterviewSessionError(Exception):
@@ -172,6 +176,8 @@ async def assign_question(
     question = await session.scalar(select(Question).where(Question.id == question_id))
     if question is None:
         raise QuestionNotFoundError
+    if question.status != QuestionStatus.ACTIVE:
+        raise QuestionNotActiveError
 
     assignment = InterviewQuestion(
         interview_session_id=interview_session_id,
@@ -200,6 +206,8 @@ async def assign_questions(
     ).all()
     if len(questions) != len(question_ids):
         raise QuestionNotFoundError
+    if any(question.status != QuestionStatus.ACTIVE for question in questions):
+        raise QuestionNotActiveError
 
     records = [
         InterviewQuestion(

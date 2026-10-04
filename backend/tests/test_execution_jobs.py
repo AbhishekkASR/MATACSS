@@ -15,11 +15,12 @@ from sqlalchemy.pool import StaticPool
 from app.api.routes.submissions import get_sandbox_service
 from app.core.database import get_db_session
 from app.main import app
-from app.models import Base, ExecutionJob, Submission
+from app.models import Base, ExecutionJob, QuestionStatus, Submission
 from app.schemas.execution import ExecutionResult
 from app.services.execution_worker import process_next_execution_job
 from app.services.execution_worker import ExecutionWorker
 from app.services.execution_queue import find_stale_running_jobs, mark_stale_running_jobs
+from tests.question_helpers import set_question_status
 
 
 @pytest.fixture(scope="module")
@@ -79,6 +80,9 @@ def context(client: TestClient) -> tuple[dict, dict]:
             "expected_language": "python",
         },
     ).json()
+    set_question_status(
+        client, [question["question_id"]], QuestionStatus.ACTIVE
+    )
     assert client.post(
         f"/api/v1/interviews/{interview['interview_session_id']}/questions",
         json={"question_id": question["question_id"], "sequence_number": 1},

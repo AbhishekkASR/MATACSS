@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import DateTime, ForeignKey, Integer, Text
+from sqlalchemy import Boolean, ForeignKey, Integer, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, CreatedAtMixin, UUIDPrimaryKeyMixin
@@ -26,4 +26,10 @@ class QuestionTestCase(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
     expected_stdout: Mapped[str] = mapped_column(Text, nullable=False)
     time_limit_ms: Mapped[int | None] = mapped_column(Integer)
     description: Mapped[str | None] = mapped_column(Text)
+
+    # ── Question Bank classification (added by migration 006) ────────────────
+    is_sample: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_functional: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    tc_order: Mapped[int | None] = mapped_column(Integer)
+
     question: Mapped[Question] = relationship(back_populates="test_cases")

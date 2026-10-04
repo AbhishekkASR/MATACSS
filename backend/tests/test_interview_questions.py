@@ -12,6 +12,8 @@ from sqlalchemy.pool import StaticPool
 from app.core.database import get_db_session
 from app.main import app
 from app.models import Base
+from app.models.question import QuestionStatus
+from tests.question_helpers import set_question_status
 
 
 @pytest.fixture
@@ -57,6 +59,11 @@ def assessment(client: TestClient) -> tuple[dict, list[dict]]:
         ).json()
         for index in range(1, 4)
     ]
+    set_question_status(
+        client,
+        [question["question_id"] for question in questions],
+        QuestionStatus.ACTIVE,
+    )
     return interview, questions
 
 
@@ -166,6 +173,52 @@ def test_bulk_missing_question_rolls_back(client: TestClient) -> None:
         },
     )
     assert response.status_code == 404
+    assert client.get(
+        f"/api/v1/interviews/{interview['interview_session_id']}/questions"
+    ).json() == []
+
+
+@pytest.mark.parametrize(
+    "question_status",
+    [
+        QuestionStatus.DRAFT,
+        QuestionStatus.VALIDATED,
+        QuestionStatus.APPROVED,
+        QuestionStatus.DEPRECATED,
+    ],
+)
+def test_single_assignment_rejects_non_active_questions(
+    client: TestClient, question_status: QuestionStatus
+) -> None:
+    interview, questions = assessment(client)
+    question = questions[0]
+    set_question_status(client, [question["question_id"]], question_status)
+
+    response = client.post(
+        f"/api/v1/interviews/{interview['interview_session_id']}/questions",
+        json={"question_id": question["question_id"], "sequence_number": 1},
+    )
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Only active questions may be assigned"
+
+
+def test_bulk_assignment_rejects_non_active_questions_without_partial_assignment(
+    client: TestClient,
+) -> None:
+    interview, questions = assessment(client)
+    set_question_status(
+        client, [questions[1]["question_id"]], QuestionStatus.VALIDATED
+    )
+    response = client.post(
+        f"/api/v1/interviews/{interview['interview_session_id']}/questions/bulk",
+        json={
+            "questions": [
+                {"question_id": questions[0]["question_id"], "sequence_number": 1},
+                {"question_id": questions[1]["question_id"], "sequence_number": 2},
+            ]
+        },
+    )
+    assert response.status_code == 409
     assert client.get(
         f"/api/v1/interviews/{interview['interview_session_id']}/questions"
     ).json() == []

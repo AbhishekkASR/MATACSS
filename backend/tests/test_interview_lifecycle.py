@@ -14,7 +14,7 @@ from sqlalchemy.pool import StaticPool
 from app.api.routes.submissions import get_sandbox_service
 from app.core.database import get_db_session
 from app.main import app
-from app.models import Base
+from app.models import Base, QuestionStatus
 from app.schemas.execution import ExecutionResult
 from app.services.database_service import (
     create_candidate,
@@ -22,6 +22,7 @@ from app.services.database_service import (
     transition_interview_session,
 )
 from app.models.interview import InterviewStatus
+from tests.question_helpers import set_question_status
 
 
 @pytest.fixture
@@ -83,6 +84,11 @@ def assessment(client: TestClient) -> tuple[dict, list[dict]]:
         ).json()
         for index in range(1, 4)
     ]
+    set_question_status(
+        client,
+        [question["question_id"] for question in questions],
+        QuestionStatus.ACTIVE,
+    )
     assignment = client.post(
         f"/api/v1/interviews/{interview['interview_session_id']}/questions/bulk",
         json={

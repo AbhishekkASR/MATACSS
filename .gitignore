@@ -43,3 +43,11 @@ Thumbs.db
 *.pem
 *.key
 *.crt
+
+# Raw question bank datasets (128 MB+ -- use scripts/download_livecodebench.py)
+# Git LFS is not required; obtain datasets via the download script.
+data/question_bank/**/*.jsonl
+data/question_bank/**/*.json
+data/question_bank/livecodebench/LiveCodeBench.tmp
+# Keep directory structure in Git
+!data/question_bank/**/.gitkeep

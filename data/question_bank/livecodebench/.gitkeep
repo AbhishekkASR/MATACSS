@@ -1,0 +1,13 @@
+# LiveCodeBench dataset directory
+#
+# The raw dataset file (LiveCodeBench.jsonl, ~128 MB) is NOT committed to Git.
+# It is excluded via .gitignore to avoid exceeding GitHub file size limits.
+#
+# To obtain the dataset:
+#   python backend/scripts/download_livecodebench.py
+#
+# Or place the file manually and verify its SHA-256:
+#   BB4C364F71921C4495A6AD15ABE1A927350B720009F4933E2E71F8AF0F6FD1F5
+#
+# After the dataset is present, run the importer:
+#   python backend/scripts/import_livecodebench.py

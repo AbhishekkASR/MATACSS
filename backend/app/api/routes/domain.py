@@ -43,6 +43,7 @@ from app.services.database_service import (
     InterviewSessionNotFoundError,
     InterviewQuestionAssignmentConflictError,
     QuestionNotFoundError,
+    QuestionNotActiveError,
     list_assigned_questions,
     get_submission_attempts,
     get_latest_submission,
@@ -361,6 +362,10 @@ async def assign_question_route(
         raise HTTPException(status_code=404, detail="Interview session not found") from exc
     except QuestionNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Question not found") from exc
+    except QuestionNotActiveError as exc:
+        raise HTTPException(
+            status_code=409, detail="Only active questions may be assigned"
+        ) from exc
     except InterviewSessionAlreadyClosedError as exc:
         raise HTTPException(
             status_code=409, detail="Interview session is not active"
@@ -396,6 +401,10 @@ async def assign_questions_bulk_route(
         raise HTTPException(status_code=404, detail="Interview session not found") from exc
     except QuestionNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Question not found") from exc
+    except QuestionNotActiveError as exc:
+        raise HTTPException(
+            status_code=409, detail="Only active questions may be assigned"
+        ) from exc
     except InterviewSessionAlreadyClosedError as exc:
         raise HTTPException(
             status_code=409, detail="Interview session is not active"

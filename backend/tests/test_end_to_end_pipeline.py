@@ -17,7 +17,7 @@ from sqlalchemy.pool import StaticPool
 from app.api.routes.submissions import get_sandbox_service
 from app.core.database import get_db_session
 from app.main import app
-from app.models import Base, ExecutionJob, Submission
+from app.models import Base, ExecutionJob, QuestionStatus, Submission
 from app.orchestration.assessment_graph import invoke_assessment_graph
 from app.schemas.assessment_state import (
     AssessmentProgressState,
@@ -26,6 +26,7 @@ from app.schemas.assessment_state import (
 )
 from app.schemas.execution import ExecutionResult
 from app.services.execution_worker import process_next_execution_job
+from tests.question_helpers import set_question_status
 
 
 @pytest.fixture(scope="module")
@@ -94,6 +95,7 @@ def test_submission_worker_evaluation_and_assessment_graph_pipeline(
     )
     assert question.status_code == 201
     question_id = question.json()["question_id"]
+    set_question_status(client, [question_id], QuestionStatus.ACTIVE)
     assignment = client.post(
         f"/api/v1/interviews/{interview.json()['interview_session_id']}/questions",
         json={"question_id": question_id, "sequence_number": 1},

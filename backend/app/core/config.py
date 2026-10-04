@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -94,6 +95,13 @@ class Settings:
     jwt_algorithm: str
     jwt_expire_minutes: int
     log_level: str
+    openai_api_key: str
+    openai_model: str
+    openai_timeout_seconds: float
+    azure_openai_endpoint: str
+    azure_openai_api_key: str
+    azure_openai_deployment: str
+    azure_openai_timeout_seconds: float
 
     def __init__(self) -> None:
         app_env = (os.getenv("APP_ENV") or "development").strip().lower()
@@ -133,6 +141,26 @@ class Settings:
         log_level = _env_value("MATACSS_LOG_LEVEL", "INFO").upper()
         if log_level not in {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}:
             log_level = "INFO"
+        openai_api_key = _env_value("OPENAI_API_KEY", "")
+        openai_model = _env_value("OPENAI_MODEL", "gpt-4o-mini")
+        openai_timeout_seconds = float(_env_value("OPENAI_TIMEOUT_SECONDS", "30"))
+        if not openai_model:
+            raise ValueError("OPENAI_MODEL must not be empty.")
+        if not math.isfinite(openai_timeout_seconds) or openai_timeout_seconds <= 0:
+            raise ValueError("OPENAI_TIMEOUT_SECONDS must be a positive finite number.")
+        azure_openai_endpoint = _env_value("AZURE_OPENAI_ENDPOINT", "").rstrip("/")
+        azure_openai_api_key = _env_value("AZURE_OPENAI_API_KEY", "")
+        azure_openai_deployment = _env_value("AZURE_OPENAI_DEPLOYMENT", "")
+        azure_openai_timeout_seconds = float(
+            _env_value("AZURE_OPENAI_TIMEOUT_SECONDS", "30")
+        )
+        if (
+            not math.isfinite(azure_openai_timeout_seconds)
+            or azure_openai_timeout_seconds <= 0
+        ):
+            raise ValueError(
+                "AZURE_OPENAI_TIMEOUT_SECONDS must be a positive finite number."
+            )
 
         object.__setattr__(self, "app_env", app_env)
         object.__setattr__(self, "debug", debug)
@@ -168,6 +196,15 @@ class Settings:
         object.__setattr__(self, "jwt_algorithm", jwt_algorithm)
         object.__setattr__(self, "jwt_expire_minutes", jwt_expire_minutes)
         object.__setattr__(self, "log_level", log_level)
+        object.__setattr__(self, "openai_api_key", openai_api_key)
+        object.__setattr__(self, "openai_model", openai_model)
+        object.__setattr__(self, "openai_timeout_seconds", openai_timeout_seconds)
+        object.__setattr__(self, "azure_openai_endpoint", azure_openai_endpoint)
+        object.__setattr__(self, "azure_openai_api_key", azure_openai_api_key)
+        object.__setattr__(self, "azure_openai_deployment", azure_openai_deployment)
+        object.__setattr__(
+            self, "azure_openai_timeout_seconds", azure_openai_timeout_seconds
+        )
 
         if self.app_env == "production":
             self._validate_production()
@@ -245,7 +282,14 @@ class Settings:
             f"database_url={self.redacted_database_url!r}, "
             f"frontend_origins={self.frontend_origins!r}, "
             f"api_host={self.api_host!r}, api_port={self.api_port!r}, "
-            f"jwt_secret={self.redacted_jwt_secret!r})"
+            f"jwt_secret={self.redacted_jwt_secret!r}, "
+            "openai_api_key='***', "
+            f"openai_model={self.openai_model!r}, "
+            f"openai_timeout_seconds={self.openai_timeout_seconds!r}, "
+            "azure_openai_api_key='***', "
+            f"azure_openai_endpoint={self.azure_openai_endpoint!r}, "
+            f"azure_openai_deployment={self.azure_openai_deployment!r}, "
+            f"azure_openai_timeout_seconds={self.azure_openai_timeout_seconds!r})"
         )
 
     __str__ = __repr__

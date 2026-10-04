@@ -10,7 +10,8 @@ from app.main import app
 from app.core.database import async_session_factory
 from app.services.execution_worker import process_next_execution_job
 from app.services.sandbox_service import DockerSandboxService
-from app.models import Submission
+from app.models import QuestionStatus, Submission
+from tests.question_helpers import set_question_status
 from uuid import UUID
 
 pytestmark = pytest.mark.docker
@@ -54,6 +55,7 @@ def assessment(client: TestClient) -> dict:
     )
     assert question.status_code == 201
     question_id = question.json()["question_id"]
+    set_question_status(client, [question_id], QuestionStatus.ACTIVE)
     assignment = client.post(
         f"/api/v1/interviews/{interview_id}/questions",
         json={"question_id": question_id, "sequence_number": 1},
