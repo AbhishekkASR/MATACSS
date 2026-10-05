@@ -1,4 +1,3 @@
-::: {align="center"}
 # 🚀 MATACSS
 
 ### Multi-Agent Technical Assessment & Code Sandboxing System
