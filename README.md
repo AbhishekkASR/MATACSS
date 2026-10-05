@@ -1,195 +1,603 @@
-﻿# MATACSS
+::: {align="center"}
+# 🚀 MATACSS
 
-<div align="center">
+### Multi-Agent Technical Assessment & Code Sandboxing System
+
+**An AI-assisted technical interview platform combining multi-agent
+reasoning, secure code execution, and deterministic evaluation.**
+
+`<br>`{=html}
 
 ![MATACSS](https://img.shields.io/badge/MATACSS-Multi--Agent%20Technical%20Assessment%20%26%20Code%20Sandboxing%20System-0F172A?style=for-the-badge)
 
-[![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square&logo=python)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.x-009688?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com/)
-[![Next.js](https://img.shields.io/badge/Next.js-16-000000?style=flat-square&logo=next.js)](https://nextjs.org/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791?style=flat-square&logo=postgresql)](https://www.postgresql.org/)
-[![Docker](https://img.shields.io/badge/Docker-Enabled-2496ED?style=flat-square&logo=docker)](https://www.docker.com/)
+[![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.x-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Next.js](https://img.shields.io/badge/Next.js-16-000000?style=flat-square&logo=next.js&logoColor=white)](https://nextjs.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791?style=flat-square&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Docker](https://img.shields.io/badge/Docker-Sandbox-2496ED?style=flat-square&logo=docker&logoColor=white)](https://www.docker.com/)
 [![LangGraph](https://img.shields.io/badge/LangGraph-Orchestration-FF6B6B?style=flat-square)](https://github.com/langchain-ai/langgraph)
 
-</div>
+`<br>`{=html}
 
-## Multi-Agent Technical Assessment & Code Sandboxing System
+> **Reason. Execute. Verify. Assess.**
+:::
 
-MATACSS is an AI-assisted technical interview and coding-assessment platform that combines a LangGraph multi-agent workflow, a Question Bank and Question Engine, a secure Docker-based execution boundary, and deterministic evaluation as the source of truth for correctness.
+------------------------------------------------------------------------
 
-> Core principle: LLM reasoning informs the assessment experience; deterministic execution decides the official result.
+## 🧭 What is MATACSS?
 
-## Why MATACSS
+**MATACSS** is an AI-assisted technical interview and coding-assessment
+platform designed around a strict separation between **AI reasoning and
+official code correctness**.
 
-The platform is designed for structured technical assessment workflows where the interview experience, question quality, and grading logic must all remain traceable and auditable.
+The system combines:
 
-- Interviewer, code-review, and edge-case reasoning are handled by bounded agents.
-- Question selection and assignment are managed by a dedicated Question Engine.
-- Candidate code is executed in a restricted Docker sandbox.
-- Official correctness is calculated by executable tests, not by model judgment.
-- PostgreSQL stores durable assessment and application state.
+-   🧠 **LangGraph multi-agent orchestration**
+-   📚 **Question Bank & Question Engine**
+-   🛡️ **Restricted Docker code execution**
+-   ✅ **Deterministic executable evaluation**
+-   🤖 **AI-powered advisory feedback**
+-   🗃️ **PostgreSQL durable state**
+-   🔐 **JWT authentication and role-aware authorization**
 
-## System overview
+The core principle is:
 
-```mermaid
+> **LLMs make the assessment experience smarter. Deterministic execution
+> decides whether the code is correct.**
+
+------------------------------------------------------------------------
+
+# 🎯 Why MATACSS?
+
+Technical assessment platforms need to balance **intelligence, security,
+reliability, and reproducibility**.
+
+  -----------------------------------------------------------------------
+  Challenge                           MATACSS Approach
+  ----------------------------------- -----------------------------------
+  Intelligent assessment              LangGraph multi-agent workflow
+
+  Reliable questions                  Question Bank + lifecycle
+                                      validation
+
+  Question selection                  Dedicated Question Engine
+
+  Untrusted candidate code            Restricted Docker sandbox
+
+  Objective grading                   Deterministic executable tests
+
+  AI feedback                         Separate advisory layer
+
+  Durable state                       PostgreSQL + Alembic
+
+  Authentication                      JWT + role-aware access control
+
+  Traceability                        Persistent submissions,
+                                      evaluations, provenance and lineage
+  -----------------------------------------------------------------------
+
+MATACSS deliberately separates **reasoning**, **execution**, and
+**correctness**.
+
+------------------------------------------------------------------------
+
+# 🏗️ System Architecture
+
+``` mermaid
 flowchart TD
-    Candidate --> Frontend[Next.js + Monaco Editor]
+    Candidate[Candidate] --> Frontend[Next.js + Monaco Editor]
     Frontend --> API[FastAPI API]
+
     API --> DB[(PostgreSQL)]
     API --> Engine[Question Engine]
     Engine --> Bank[Question Bank]
-    API --> Jobs[Execution Jobs]
-    Jobs --> Worker[Worker]
-    Worker --> Sandbox[Docker Sandbox]
-    Sandbox --> Eval[Deterministic Evaluation]
-    Eval --> Results[Official Results]
+
+    API --> Submission[Code Submission]
+    Submission --> Job[Execution Job]
+    Job --> Worker[Execution Worker]
+    Worker --> Sandbox[Restricted Docker Sandbox]
+    Sandbox --> Evaluation[Deterministic Evaluation]
+    Evaluation --> Result[Official Result]
+
     API --> Graph[LangGraph Orchestration]
     Graph --> Interviewer[Interviewer Agent]
     Graph --> Reviewer[Code Reviewer Agent]
-    Graph --> Edge[Edge-Case Agent]
-    Graph --> Feedback[Advisory Feedback]
-    Feedback --> Report[Assessment Report]
-    Results --> Report
+    Graph --> EdgeCases[Edge-Case Agent]
+
+    Interviewer --> Feedback[AI Advisory Feedback]
+    Reviewer --> Feedback
+    EdgeCases --> Feedback
+
+    Result --> Report[Assessment Report]
+    Feedback --> Report
     DB --> Report
 ```
 
-## Implemented today
+## Architectural Responsibilities
 
-### 1. Multi-agent assessment orchestration
+  -----------------------------------------------------------------------
+  Layer                               Responsibility
+  ----------------------------------- -----------------------------------
+  **Next.js + Monaco**                Candidate-facing interview and
+                                      coding experience
 
-MATACSS includes a LangGraph-based orchestration layer for interview assessment flows:
+  **FastAPI**                         API, authentication, interview
+                                      lifecycle and persistence
 
-- Interviewer Agent: provides a structured recommendation to continue or finish the assessment.
-- Code Reviewer Agent: produces advisory findings using safe execution context and source material.
-- Edge-Case Agent: reasons about boundary conditions and hidden test concerns without overriding official evaluation.
-- Feedback Aggregator: combines validated advisory outputs into a structured assessment report.
+  **LangGraph**                       Multi-agent orchestration and
+                                      validated state flow
 
-The LLM layer is advisory. The Question Engine resolves the next active question and deterministic execution remains the authoritative correctness layer.
+  **Question Engine**                 Question retrieval, assignment and
+                                      lifecycle-aware selection
 
-### 2. Question Bank and Question Engine
+  **Question Bank**                   Assessment questions, test cases,
+                                      provenance and lineage
 
-The repository contains a working Question Bank and Question Engine for technical assessment workflows.
+  **Execution Worker**                Durable execution-job processing
 
-Key capabilities implemented:
+  **Docker Sandbox**                  Restricted environment for
+                                      untrusted candidate code
 
-- Question lifecycle states including `draft`, `validated`, `approved`, `active`, and `deprecated`
-- Question metadata such as title, description, difficulty, expected language, constraints, and starter code
-- Executable test cases, including sample/private classification and ordering metadata
-- Provenance and lineage records, including platform-origin and source metadata
-- Validation before generated or adapted questions are approved
-- Active-question filtering, assignment, and repeat prevention
-- Difficulty and language-based filtering where the platform checks are in place
+  **Deterministic Evaluator**         Official correctness and scoring
 
-LiveCodeBench is present as an imported question source and is used to seed or normalize Question Bank entries. Its role is to provide a structured external dataset source with provenance; the raw dataset itself is not stored in the repository and no unsupported dataset totals are claimed here.
+  **PostgreSQL**                      Durable system state
 
-### 3. Secure code execution
+  **AI Feedback**                     Advisory reasoning that complements
+                                      official results
+  -----------------------------------------------------------------------
 
-Candidate code is executed inside short-lived Docker containers with explicit execution controls, including:
+------------------------------------------------------------------------
 
-- disabled networking
-- non-root execution (`65532:65532`)
-- read-only root filesystem
-- bounded writable `/tmp`
-- `nosuid` / `nodev` protections where implemented
-- `no-new-privileges`
-- dropped Linux capabilities
-- CPU, memory, PID, and timeout limits
-- bounded stdout/stderr output
-- fixed runtime commands and source paths
-- cleanup and container teardown
-- no host Docker socket and no host bind mount access
+# 🧠 Multi-Agent Assessment System
 
-This is a defense-in-depth sandbox boundary, not a claim that every possible Docker/host escape is impossible.
+MATACSS uses a bounded **LangGraph-based multi-agent workflow**.
 
-### 4. Deterministic evaluation
+### 🎤 Interviewer Agent
 
-The platform follows an explicit grading flow:
+Provides a structured recommendation about whether the assessment should
+continue or finish according to the current assessment state.
 
-1. Candidate code is submitted through the interview flow.
-2. The submission is persisted and queued as an execution job.
-3. The worker executes the code inside Docker.
-4. Test cases run against the submission.
-5. Deterministic evaluation calculates the official result.
-6. LLM-generated feedback is persisted separately as advisory guidance.
-7. The assessment report combines official correctness with AI commentary.
+### 🔍 Code Reviewer Agent
 
-The deterministic result is authoritative. LLM feedback must never override it.
+Provides advisory analysis of submitted code using the available
+assessment context.
 
-### 5. Authentication, authorization, and durable state
+### 🧪 Edge-Case Agent
 
-MATACSS includes JWT-based authentication and role-aware access control for protected endpoints. The backend stores durable application and assessment state in PostgreSQL and uses Alembic migrations for schema evolution.
+Reasons about:
 
-Current configuration supports:
+-   boundary conditions
+-   potential hidden-test weaknesses
+-   edge cases
+-   possible failure scenarios
 
-- JWT secret, algorithm, and expiry configuration
-- role-based checks for protected interview and assessment routes
-- backend-safe CORS configuration and production validation
-- PostgreSQL as the durable system of record
+### 📝 Feedback Aggregator
 
-### 6. Provider foundation for LLM access
+Combines validated advisory outputs into structured assessment feedback.
 
-The backend includes a provider abstraction for LLM access, with support for Azure OpenAI and OpenAI-style configuration. Supported inputs include:
+### Important architectural rule
 
-- Azure endpoint and API key configuration
-- deployment/model configuration
-- backend-only provider setup and validation
-- structured/native JSON handling where implemented
-- safe provider error handling
+The agents are **advisory**.
 
-No real secrets or credentials are included in the repository; configuration is expected from environment variables.
+They do **not** determine official code correctness.
 
-## Assessment flow
+``` text
+LLM Reasoning
+      │
+      ▼
+Advisory Feedback
+      │
+      ▼
+Assessment Report
 
-```text
-candidate -> interview -> question -> submission -> execution job -> Docker -> deterministic evaluation -> AI feedback -> assessment report
+Official correctness
+      ▲
+      │
+Deterministic Evaluation
 ```
 
-This is the core operational flow the project currently implements.
+------------------------------------------------------------------------
 
-## Technology stack
+# 📚 Intelligent Question Bank
 
-| Area | Technologies |
-| --- | --- |
-| Frontend | Next.js, React, TypeScript, Monaco Editor |
-| Backend | FastAPI, Python, Pydantic |
-| AI Orchestration | LangGraph |
-| Data & Persistence | PostgreSQL, SQLAlchemy, Alembic |
-| Execution | Docker, restricted sandbox runtime |
-| Model Access | Azure OpenAI / OpenAI provider foundation |
-| CI & Delivery | GitHub Actions where present in repo |
+MATACSS maintains a structured Question Bank with lifecycle controls:
 
-## Local development
+``` text
+draft
+  │
+  ▼
+validated
+  │
+  ▼
+approved
+  │
+  ▼
+active
+  │
+  ▼
+deprecated
+```
 
-### 1. Backend setup
+Questions can contain:
 
-Copy the environment template and configure the local deployment values:
+-   problem statement
+-   title
+-   difficulty
+-   expected language
+-   constraints
+-   examples
+-   starter code
+-   executable test cases
+-   provenance metadata
+-   source information
+-   LLM lineage
+-   lifecycle status
 
-```powershell
+## Question Engine
+
+The Question Engine handles:
+
+-   active-question retrieval
+-   question assignment
+-   repeat prevention
+-   supported difficulty filtering
+-   supported language filtering
+-   question lifecycle checks
+-   generated/adapted question validation
+
+------------------------------------------------------------------------
+
+# 📊 LiveCodeBench Integration
+
+MATACSS uses **LiveCodeBench as an external question source** for the
+Question Bank.
+
+Imported content is normalized into MATACSS structures while preserving
+source and provenance information.
+
+The dataset is treated as a **source of assessment content**, while
+MATACSS maintains its own question lifecycle and validation rules.
+
+> Generated or adapted questions must pass validation before entering
+> the approved assessment flow.
+
+------------------------------------------------------------------------
+
+# 🛡️ Secure Code Execution
+
+Candidate code is treated as **untrusted input**.
+
+MATACSS executes submissions inside short-lived Docker containers with
+multiple defense-in-depth controls.
+
+### Sandbox Controls
+
+-   🌐 Network disabled
+-   👤 Non-root execution (`65532:65532`)
+-   🔒 Read-only root filesystem
+-   📁 Bounded writable `/tmp`
+-   🚫 `nosuid` / `nodev` protections where implemented
+-   🚫 `no-new-privileges`
+-   🧱 Dropped Linux capabilities
+-   💾 Memory limits
+-   ⚡ CPU limits
+-   🔢 PID limits
+-   ⏱️ Execution timeout
+-   📤 Bounded stdout/stderr
+-   📌 Fixed runtime commands and source paths
+-   🧹 Container cleanup and teardown
+-   🚫 No host Docker socket
+-   🚫 No host bind-mount access
+
+These controls form a **defense-in-depth execution boundary**. They are
+not a claim that every possible Docker or host escape is impossible.
+
+------------------------------------------------------------------------
+
+# ⚙️ Deterministic Evaluation
+
+MATACSS separates **execution** from **correctness**.
+
+``` text
+Candidate Submission
+        │
+        ▼
+Persist Submission
+        │
+        ▼
+Execution Job
+        │
+        ▼
+Execution Worker
+        │
+        ▼
+Docker Sandbox
+        │
+        ▼
+Executable Test Cases
+        │
+        ▼
+Deterministic Evaluation
+        │
+        ▼
+Official Result
+```
+
+The result produced by deterministic evaluation is the **authoritative
+assessment result**.
+
+AI-generated feedback cannot override it.
+
+> **AI explains. Tests decide.**
+
+------------------------------------------------------------------------
+
+# 🤖 AI Feedback
+
+After deterministic evaluation, the multi-agent system can provide
+advisory analysis around:
+
+-   code quality
+-   reasoning concerns
+-   edge cases
+-   hidden-test weaknesses
+-   interview continuation recommendations
+-   assessment observations
+
+The feedback is persisted separately from the official evaluation.
+
+``` text
+Official Result
+       +
+AI Advisory Feedback
+       │
+       ▼
+Assessment Report
+```
+
+------------------------------------------------------------------------
+
+# 🔐 Authentication & Durable State
+
+MATACSS includes JWT-based authentication and role-aware authorization.
+
+### Security & State
+
+-   JWT authentication
+-   configurable JWT algorithm
+-   configurable token expiry
+-   role-aware protected endpoints
+-   production configuration validation
+-   backend-safe CORS configuration
+-   PostgreSQL durable state
+-   Alembic schema migrations
+
+PostgreSQL acts as the durable system of record for the assessment
+lifecycle.
+
+------------------------------------------------------------------------
+
+# 🔄 End-to-End Assessment Flow
+
+``` text
+Candidate
+   │
+   ▼
+Interview
+   │
+   ▼
+Question Engine
+   │
+   ▼
+Active Question
+   │
+   ▼
+Monaco Editor
+   │
+   ▼
+Code Submission
+   │
+   ▼
+Execution Job
+   │
+   ▼
+Docker Sandbox
+   │
+   ▼
+Executable Test Cases
+   │
+   ▼
+Deterministic Evaluation
+   │
+   ├──────────────► Official Result
+   │
+   ▼
+LangGraph Agents
+   │
+   ▼
+AI Feedback
+   │
+   ▼
+Assessment Report
+```
+
+### Core workflow
+
+**Select → Solve → Execute → Verify → Explain → Assess**
+
+------------------------------------------------------------------------
+
+# 🧰 Technology Stack
+
+  -----------------------------------------------------------------------
+  Category                            Technologies
+  ----------------------------------- -----------------------------------
+  **Frontend**                        Next.js, React, TypeScript, Monaco
+                                      Editor
+
+  **Backend**                         FastAPI, Python, Pydantic
+
+  **AI Orchestration**                LangGraph
+
+  **Database**                        PostgreSQL
+
+  **ORM**                             SQLAlchemy
+
+  **Migrations**                      Alembic
+
+  **Execution**                       Docker
+
+  **LLM Provider Foundation**         Azure OpenAI / OpenAI-compatible
+                                      configuration
+
+  **Testing**                         Pytest, frontend lint/build checks
+
+  **CI/CD**                           GitHub Actions where present
+  -----------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+# 🚧 Implementation Status
+
+## ✅ Implemented
+
+-   FastAPI backend
+-   Next.js frontend
+-   Monaco coding interface
+-   Candidate management
+-   Interview lifecycle
+-   Question Bank
+-   Question Engine
+-   Question lifecycle validation
+-   LiveCodeBench integration
+-   Persistent submissions
+-   Durable execution jobs
+-   Execution worker
+-   Restricted Docker sandbox
+-   Deterministic evaluation
+-   Assessment results
+-   Assessment feedback
+-   LangGraph orchestration
+-   Interviewer Agent
+-   Code Reviewer Agent
+-   Edge-Case Agent
+-   Feedback aggregation
+-   Azure/OpenAI provider foundation
+-   JWT authentication
+-   Role-aware authorization
+-   PostgreSQL persistence
+-   Alembic migrations
+-   Production configuration validation
+-   Security hardening
+-   Automated backend/frontend verification
+
+------------------------------------------------------------------------
+
+# 🧪 Verified Engineering Status
+
+The implementation has been verified through automated and integration
+testing.
+
+### Verification completed
+
+-   **315 backend tests passed**
+-   **29 PostgreSQL/Docker integration tests passed**
+-   Frontend lint passed
+-   Frontend build and TypeScript checks passed
+-   Python compilation passed
+-   `git diff --check` passed
+-   Alembic has a single current migration head
+-   Real Docker execution verified
+-   Deterministic evaluation verified
+-   LangGraph advisory feedback persisted
+-   End-to-end assessment flow verified
+
+### Verified assessment path
+
+``` text
+Submission
+    ↓
+Execution Job
+    ↓
+Docker
+    ↓
+Deterministic Evaluation
+    ↓
+Official Result
+    ↓
+LangGraph Advisory Feedback
+    ↓
+Assessment Completion
+```
+
+------------------------------------------------------------------------
+
+# 🗺️ Future Roadmap
+
+The following are **future directions**, not claims about the current
+implementation.
+
+## Intelligence
+
+-   Adaptive interviewing
+-   Dynamic difficulty rebalancing
+-   Deeper autonomous question generation
+-   More advanced multi-stage reasoning workflows
+
+## Scale
+
+-   Larger distributed execution infrastructure
+-   Additional worker orchestration capabilities
+-   Production-scale operational tooling
+
+## Platform
+
+-   Expanded assessment analytics
+-   More advanced reviewer workflows
+-   Additional programming-language support
+-   Further security and infrastructure hardening
+
+------------------------------------------------------------------------
+
+# 🛠️ Local Development
+
+## 1. Configure the backend
+
+``` powershell
 Copy-Item backend/.env.example backend/.env
 ```
 
-The backend expects PostgreSQL, JWT settings, Docker execution configuration, and optional LLM credentials via environment variables. The example file shows the current runtime contract.
+Configure:
 
-### 2. Start the stack
+-   PostgreSQL
+-   JWT settings
+-   Docker execution settings
+-   optional LLM provider settings
 
-```powershell
+**Never commit real credentials or API keys.**
+
+## 2. Start the development stack
+
+``` powershell
 docker compose --env-file backend/.env -f backend/docker-compose.yml up --build -d
 ```
 
-This compose stack starts PostgreSQL, the Alembic migration step, the FastAPI API, the execution worker, and the Next.js frontend.
+## 3. Check services
 
-### 3. Validate and inspect
-
-```powershell
+``` powershell
 docker compose --env-file backend/.env -f backend/docker-compose.yml ps
 ```
 
-For manual migration work, the repository relies on Alembic-based schema upgrades and the backend's configured PostgreSQL database.
+For schema changes, MATACSS uses Alembic migrations against the
+configured PostgreSQL database.
 
-## Repository structure
+------------------------------------------------------------------------
 
-```text
+# 🧱 Repository Structure
+
+``` text
 MATACSS/
+│
 ├── backend/
 │   ├── app/
 │   ├── alembic/
@@ -198,32 +606,119 @@ MATACSS/
 │   ├── .env.example
 │   ├── docker-compose.yml
 │   └── requirements.txt
+│
 ├── frontend/
 │   ├── app/
 │   ├── components/
 │   ├── lib/
 │   └── package.json
-├── docs/
+│
 ├── data/
+├── docs/
+├── .github/
 ├── README.md
-├── .gitignore
-└── .github/
+└── .gitignore
 ```
 
-## Future work and roadmap
+------------------------------------------------------------------------
 
-The following items are not presented as implemented in the current codebase:
+# 🎯 Design Principle
 
-- adaptive interviewing and dynamic question difficulty rebalancing
-- deeper autonomous question generation beyond the current foundations
-- advanced multi-stage LLM reasoning workflows beyond the present bounded agent design
-- additional distributed execution infrastructure such as Redis, RabbitMQ, Celery, or ARQ job queues
-- guaranteed host-level escape prevention claims for any Docker deployment
+MATACSS is built around a strict architectural boundary:
 
-These items may be future product directions, but the current implementation remains conservative and grounded in the repository as it exists today.
+``` text
+                    AI
+             Reason & Explain
+                     │
+                     ▼
+             LangGraph Agents
+                     │
+                     ▼
+             Assessment Logic
+                     │
+                     ▼
+              Code Execution
+                     │
+                     ▼
+              Docker Sandbox
+                     │
+                     ▼
+          Deterministic Evaluation
+                     │
+                     ▼
+               Official Result
+```
 
-## Closing
+### The philosophy
 
-MATACSS is built around a clear architectural boundary: AI guides the assessment experience, while Docker execution and deterministic tests decide correctness. That balance makes the system suitable for technical interviews, code-assessment workflows, and structured reviewer tooling without allowing model output to silently override objective test results.
+> **AI makes the assessment smarter.\
+> Deterministic execution keeps it trustworthy.**
 
-If you are evaluating the project as a software engineering effort, the strongest signals are the combination of LangGraph orchestration, secure sandbox execution, Question Bank lifecycle controls, PostgreSQL durability, and a strict deterministic grading model.
+------------------------------------------------------------------------
+
+# 🌟 Why MATACSS is Different
+
+MATACSS is not simply an LLM wrapper around a coding editor.
+
+It combines several engineering boundaries:
+
+``` text
+┌─────────────────────────────────────┐
+│        Intelligent Assessment      │
+│          LangGraph Agents           │
+├─────────────────────────────────────┤
+│         Question Intelligence       │
+│       Question Bank + Engine        │
+├─────────────────────────────────────┤
+│          Secure Execution           │
+│          Docker Sandbox             │
+├─────────────────────────────────────┤
+│         Objective Evaluation        │
+│      Deterministic Test Engine      │
+├─────────────────────────────────────┤
+│          Durable State              │
+│            PostgreSQL               │
+└─────────────────────────────────────┘
+```
+
+The goal is to combine **AI reasoning with software-engineering
+discipline** rather than allowing AI to become the grading authority.
+
+------------------------------------------------------------------------
+
+# 🔮 Project Vision
+
+MATACSS is being developed toward a complete technical assessment
+platform where:
+
+``` text
+Question Selection
+       ↓
+Candidate Interview
+       ↓
+Secure Code Execution
+       ↓
+Deterministic Evaluation
+       ↓
+Multi-Agent Analysis
+       ↓
+Assessment Report
+```
+
+can operate as one reliable, traceable system.
+
+The long-term objective is not simply to add more AI.
+
+It is to build a system where **AI reasoning, secure execution,
+deterministic evaluation, and durable engineering architecture work
+together.**
+
+------------------------------------------------------------------------
+
+::: {align="center"}
+# MATACSS
+
+### Reason. Execute. Verify. Assess.
+
+**AI-assisted assessment with deterministic correctness.**
+:::
